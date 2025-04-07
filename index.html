@@ -2,21 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Galaga Bar Blast</title>
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
       background: black;
       overflow: hidden;
       color: white;
       font-family: sans-serif;
+      touch-action: none;
     }
     #gameCanvas {
       display: block;
-      margin: 0 auto;
       background: #111;
       border: 2px solid #ffcc00;
-      touch-action: none;
+      width: 100vw;
+      height: 100vh;
     }
     #hud {
       position: absolute;
@@ -25,7 +29,7 @@
       right: 0;
       display: flex;
       justify-content: center;
-      font-size: 52px;
+      font-size: 6vw;
       pointer-events: none;
       z-index: 10;
     }
@@ -36,7 +40,7 @@
 </head>
 <body>
 
-<canvas id="gameCanvas" width="480" height="640"></canvas>
+<canvas id="gameCanvas"></canvas>
 <div id="hud">
   <span id="score">100</span>
 </div>
@@ -44,9 +48,15 @@
 <script>
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
 
   const drinkEmojis = ["🍺", "🍷", "🥃", "🍸", "🍹"];
-  const player = { x: canvas.width / 2 - 15, y: canvas.height - 50, width: 30, height: 30 };
+  const player = { x: canvas.width / 2 - 15, y: canvas.height - 60, width: 30, height: 30 };
   const bullets = [];
   const enemies = [];
   const powerUps = [];
