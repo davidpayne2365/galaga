@@ -44,18 +44,13 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let score = 100;
-let highScore = 100;
-const player = { x: canvas.width / 2 - 15, y: canvas.height - 50, width: 30, height: 30 };
+let highScore = localStorage.getItem('highScore') || 100;
+const player = { x: canvas.width / 2 - 15, y: canvas.height - 80, width: 30, height: 30, shield: 0 };
 const bullets = [];
 const drinkEmojis = ["🍺", "🍷", "🥃", "🍸", "🍹", "🍾", "🥂", "🧃", "🧋", "🍶", "🍵", "☕", "🥤", "🍼"];
 const enemies = [];
-const particles = [];
-const powerUps = [];
-const shields = [];
-const bombs = [];
 let shootCooldown = 0;
 let lastSpawn = 0;
-let backgroundOffset = 0;
 let multiShotLevel = 0;
 
 function drawPlayer() {
@@ -75,74 +70,24 @@ function drawBullet(b) {
 
 function drawEnemy(e) {
   ctx.font = "24px Arial";
-  ctx.fillText(e.emoji || "🍺", e.x, e.y);
-}
-
-function drawParticles() {
-  particles.forEach((p, i) => {
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, 2, 2);
-    p.y += p.dy;
-    p.life--;
-    if (p.life <= 0) particles.splice(i, 1);
-  });
-}
-
-function updateBackground() {
-  backgroundOffset += 1;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = "#222";
-  for (let y = -20; y < canvas.height; y += 40) {
-    ctx.beginPath();
-    ctx.moveTo(0, y + (backgroundOffset % 40));
-    ctx.lineTo(canvas.width, y + (backgroundOffset % 40));
-    ctx.stroke();
-  }
+  ctx.fillText(e.emoji, e.x, e.y);
 }
 
 function shoot() {
   const bulletColor = multiShotLevel >= 4 ? "cyan" : multiShotLevel >= 2 ? "lime" : "yellow";
   bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 10, color: bulletColor });
-  if (multiShotLevel >= 1) bullets.push({ x: player.x + 2, y: player.y, width: 4, height: 10, color: bulletColor });
-  if (multiShotLevel >= 2) bullets.push({ x: player.x + player.width - 6, y: player.y, width: 4, height: 10, color: bulletColor });
-  if (multiShotLevel >= 3) bullets.push({ x: player.x - 4, y: player.y + 5, width: 4, height: 10, color: bulletColor });
-  if (multiShotLevel >= 5) bullets.push({ x: player.x + player.width + 2, y: player.y + 5, width: 4, height: 10, color: bulletColor });
-  if (multiShotLevel >= 6) bullets.push({ x: player.x + player.width / 2 - 2, y: player.y - 5, width: 4, height: 10, color: "white" });
 }
 
 function update() {
-  if (player.shield > 0) player.shield--;
-
-  // Spawn enemies
-  if (Date.now() - lastSpawn > Math.max(300, 1200 - score * 5)) {
-    enemies.push({
-      x: Math.random() * (canvas.width - 24),
-      y: -30,
-      speed: 1 + Math.min(score / 50, 1),
-      emoji: drinkEmojis[Math.floor(Math.random() * drinkEmojis.length)]
-    });
+  if (Date.now() - lastSpawn > Math.max(500, 1200 - score * 5)) {
+    enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: 1, emoji: drinkEmojis[Math.floor(Math.random() * drinkEmojis.length)] });
     lastSpawn = Date.now();
   }
 
-  // Occasionally drop power-ups, shields, bombs
-  if (Math.random() < 0.0003) {
-    const type = Math.random();
-    if (type < 0.6) {
-      powerUps.push({ x: Math.random() * (canvas.width - 30), y: -30, speed: 2 });
-    } else if (type < 0.85) {
-      shields.push({ x: Math.random() * (canvas.width - 30), y: -30, speed: 2 });
-    } else {
-      bombs.push({ x: Math.random() * (canvas.width - 30), y: -30, speed: 2 });
-    }
-  }
-
-  // Move bullets
   bullets.forEach((b, i) => {
     b.y -= 6;
     if (b.y < 0) bullets.splice(i, 1);
   });
-    
 
   enemies.forEach((e, i) => {
     e.y += e.speed;
@@ -152,6 +97,7 @@ function update() {
       document.getElementById("score").textContent = score;
       if (score <= 0) {
         alert("Game Over! High Score: " + highScore);
+        localStorage.setItem('highScore', highScore);
         document.location.reload();
       }
     }
@@ -159,16 +105,12 @@ function update() {
 
   bullets.forEach((b, bi) => {
     enemies.forEach((e, ei) => {
-      if (b.x < e.x + 20 && b.x + b.width > e.x && b.y < e.y + 20 && b.y + b.height > e.y) {
-        for (let j = 0; j < 5; j++) {
-          particles.push({ x: e.x + 10, y: e.y + 10, dy: Math.random() * 1 + 1, color: "orange", life: 20 });
-        }
+      if (b.x < e.x + 24 && b.x + b.width > e.x && b.y < e.y + 24 && b.y + b.height > e.y) {
         enemies.splice(ei, 1);
         bullets.splice(bi, 1);
         score++;
-        if (score > highScore) highScore = score;
         document.getElementById("score").textContent = score;
-        if (score % 10 === 0 && multiShotLevel < 3) multiShotLevel++;
+        if (score > highScore) highScore = score;
       }
     });
   });
@@ -176,81 +118,14 @@ function update() {
   if (shootCooldown <= 0) {
     shoot();
     shootCooldown = 150;
-  } else {
-    shootCooldown -= 16;
-  }
+  } else shootCooldown -= 16;
 }
 
 function draw() {
-  updateBackground();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawPlayer();
   bullets.forEach(drawBullet);
-  ctx.font = "24px Arial";
   enemies.forEach(drawEnemy);
-  drawParticles();
-  drawPowerUps();
-  drawShields();
-  drawBombs();
-}
-
-function drawPowerUps() {
-  ctx.fillStyle = 'lime';
-  powerUps.forEach((p, i) => {
-    ctx.font = '24px Arial';
-    ctx.fillText('⚡', p.x, p.y);
-    p.y += p.speed;
-    if (
-      p.x < player.x + player.width &&
-      p.x + 20 > player.x &&
-      p.y < player.y + player.height &&
-      p.y + 20 > player.y
-    ) {
-      powerUps.splice(i, 1);
-      if (multiShotLevel < 6) multiShotLevel++;
-    } else if (p.y > canvas.height) {
-      powerUps.splice(i, 1);
-    }
-  });
-}
-
-function drawShields() {
-  ctx.fillStyle = 'skyblue';
-  shields.forEach((s, i) => {
-    ctx.font = '24px Arial';
-    ctx.fillText('🛡️', s.x, s.y);
-    s.y += s.speed;
-    if (
-      s.x < player.x + player.width &&
-      s.x + 20 > player.x &&
-      s.y < player.y + player.height &&
-      s.y + 20 > player.y
-    ) {
-      shields.splice(i, 1);
-      player.shield = 300; // frames of protection
-    } else if (s.y > canvas.height) {
-      shields.splice(i, 1);
-    }
-  });
-}
-
-function drawBombs() {
-  ctx.fillStyle = 'red';
-  bombs.forEach((b, i) => {
-    ctx.font = '24px Arial';
-    ctx.fillText('💣', b.x, b.y);
-    b.y += b.speed;
-    if (
-      b.x < player.x + player.width &&
-      b.x + 20 > player.x &&
-      b.y < player.y + player.height &&
-      b.y + 20 > player.y
-    ) {
-      bombs.splice(i, 1);
-      enemies.length = 0; // clear all enemies
-    } else if (b.y > canvas.height) {
-      bombs.splice(i, 1);
-    }
-  });
 }
 
 function gameLoop() {
@@ -261,21 +136,13 @@ function gameLoop() {
 
 gameLoop();
 
-canvas.addEventListener("touchstart", e => {
-  const x = e.touches[0].clientX;
-  player.x = Math.max(0, Math.min(canvas.width - player.width, x - player.width / 2));
+canvas.addEventListener("touchmove", e => {
+  const touchX = e.touches[0].clientX;
+  player.x += (touchX - player.x) * 0.2;
 });
 
-canvas.addEventListener("touchmove", e => {
-  const x = e.touches[0].clientX;
-  player.x = Math.max(0, Math.min(canvas.width - player.width, x - player.width / 2));
-  e.preventDefault();
-}, { passive: false });
-
 canvas.addEventListener("mousemove", e => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  player.x = Math.max(0, Math.min(canvas.width - player.width, x - player.width / 2));
+  player.x = e.clientX - player.width / 2;
 });
 </script>
 
