@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Galaga Bar Blast</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
+      width: 100%;
       background: black;
       overflow: hidden;
       color: white;
@@ -16,14 +17,17 @@
       touch-action: none;
     }
     #gameCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       display: block;
       background: #111;
-      border: 2px solid #ffcc00;
-      width: 100vw;
-      height: 100vh;
+      border: none;
     }
     #hud {
-      position: absolute;
+      position: fixed;
       top: 10px;
       left: 0;
       right: 0;
