@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Galaga Bar Blast Lite+</title>
+  <title>Galaga Bar Blast ++ Ultimate</title>
   <style>
     html, body {
       margin: 0;
@@ -45,16 +45,33 @@ canvas.height = window.innerHeight;
 
 let score = 100;
 let highScore = localStorage.getItem('highScore') || 100;
-const player = { x: canvas.width / 2 - 15, y: canvas.height - 80, width: 30, height: 30, shield: 0 };
+
+const player = {
+  x: canvas.width / 2 - 15,
+  y: canvas.height - 140,
+  width: 30,
+  height: 30,
+  shield: 0,
+  color: "cyan",
+  rapidFire: 0,
+  magnet: 0
+};
+
 const bullets = [];
-const drinkEmojis = ["🍺", "🍷", "🥃", "🍸", "🍹", "🍾", "🥂", "🧃", "🧋", "🍶", "🍵", "☕", "🥤", "🍼"];
+const drinkEmojis = ["🍺", "🍷", "🥃", "🍸", "🍹", "🍾", "🥂", "🧃", "🧋", "🍶", "🍵", "☕", "🥤", "🍼", "🚀"];
 const enemies = [];
+const powerUps = [];
+
 let shootCooldown = 0;
 let lastSpawn = 0;
+let lastPowerUp = 0;
 let multiShotLevel = 0;
 
+const powerUpTypes = ["multi", "shield", "bomb", "score", "rapid", "pierce", "magnet", "slow"];
+let slowMotion = 0;
+
 function drawPlayer() {
-  ctx.fillStyle = player.shield > 0 ? "lightblue" : "cyan";
+  ctx.fillStyle = player.shield > 0 ? "lightblue" : player.rapidFire > 0 ? "orange" : player.color;
   ctx.beginPath();
   ctx.moveTo(player.x + player.width / 2, player.y);
   ctx.lineTo(player.x, player.y + player.height);
@@ -69,28 +86,84 @@ function drawBullet(b) {
 }
 
 function drawEnemy(e) {
-  ctx.font = "24px Arial";
+  ctx.font = e.hp > 1 ? "28px Arial" : "24px Arial";
   ctx.fillText(e.emoji, e.x, e.y);
+}
+
+function drawPowerUps() {
+  ctx.font = "24px Arial";
+  powerUps.forEach((p) => {
+    const symbols = {
+      multi: "⚡",
+      shield: "🛡️",
+      bomb: "💣",
+      score: "⭐",
+      rapid: "💨",
+      pierce: "🔱",
+      magnet: "🧲",
+      slow: "🌀"
+    };
+    ctx.fillText(symbols[p.type], p.x, p.y);
+  });
 }
 
 function shoot() {
   const bulletColor = multiShotLevel >= 4 ? "cyan" : multiShotLevel >= 2 ? "lime" : "yellow";
-  bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 10, color: bulletColor });
+  const piercing = player.piercing > 0;
+  const bulletData = { width: 4, height: 10, color: bulletColor, piercing: piercing };
+  bullets.push({ ...bulletData, x: player.x + player.width / 2 - 2, y: player.y });
+  if (multiShotLevel >= 1) bullets.push({ ...bulletData, x: player.x + 2, y: player.y });
+  if (multiShotLevel >= 2) bullets.push({ ...bulletData, x: player.x + player.width - 6, y: player.y });
+  if (multiShotLevel >= 3) bullets.push({ ...bulletData, x: player.x - 4, y: player.y + 5 });
+  if (multiShotLevel >= 5) bullets.push({ ...bulletData, x: player.x + player.width + 2, y: player.y + 5 });
+  if (multiShotLevel >= 6) bullets.push({ ...bulletData, x: player.x + player.width / 2 - 2, y: player.y - 5 });
+}
+
+function spawnEnemy() {
+  const emoji = drinkEmojis[Math.floor(Math.random() * drinkEmojis.length)];
+  const zigzag = emoji === "🚀";
+  enemies.push({
+    x: Math.random() * (canvas.width - 24),
+    y: -30,
+    speed: 1 + Math.min(score / 60, 2),
+    emoji: emoji,
+    hp: emoji === "🍔" || emoji === "🍕" ? 5 : 1,
+    zigzag: zigzag,
+    direction: Math.random() < 0.5 ? -1 : 1
+  });
+}
+
+function spawnPowerUp() {
+  const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+  powerUps.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: 2, type });
 }
 
 function update() {
-  if (Date.now() - lastSpawn > Math.max(500, 1200 - score * 5)) {
-    enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: 1, emoji: drinkEmojis[Math.floor(Math.random() * drinkEmojis.length)] });
+  if (player.shield > 0) player.shield--;
+  if (player.rapidFire > 0) player.rapidFire--;
+  if (player.piercing > 0) player.piercing--;
+  if (player.magnet > 0) player.magnet--;
+  if (slowMotion > 0) slowMotion--;
+
+  const timeFactor = slowMotion > 0 ? 2 : 1;
+
+  if (Date.now() - lastSpawn > (600 / timeFactor)) {
+    spawnEnemy();
     lastSpawn = Date.now();
+  }
+  if (Date.now() - lastPowerUp > 10000) {
+    if (Math.random() < 0.5) spawnPowerUp();
+    lastPowerUp = Date.now();
   }
 
   bullets.forEach((b, i) => {
-    b.y -= 6;
+    b.y -= 6 / timeFactor;
     if (b.y < 0) bullets.splice(i, 1);
   });
 
   enemies.forEach((e, i) => {
-    e.y += e.speed;
+    if (e.zigzag) e.x += Math.sin(e.y / 20) * 2 * e.direction;
+    e.y += e.speed / timeFactor;
     if (e.y > canvas.height) {
       enemies.splice(i, 1);
       score--;
@@ -106,19 +179,45 @@ function update() {
   bullets.forEach((b, bi) => {
     enemies.forEach((e, ei) => {
       if (b.x < e.x + 24 && b.x + b.width > e.x && b.y < e.y + 24 && b.y + b.height > e.y) {
-        enemies.splice(ei, 1);
-        bullets.splice(bi, 1);
+        if (!b.piercing) bullets.splice(bi, 1);
+        e.hp--;
+        if (e.hp <= 0) enemies.splice(ei, 1);
         score++;
-        document.getElementById("score").textContent = score;
         if (score > highScore) highScore = score;
+        document.getElementById("score").textContent = score;
       }
     });
   });
 
   if (shootCooldown <= 0) {
     shoot();
-    shootCooldown = 150;
-  } else shootCooldown -= 16;
+    shootCooldown = player.rapidFire > 0 ? 60 : 150;
+  } else shootCooldown -= 16 / timeFactor;
+
+  powerUps.forEach((p, i) => {
+    p.y += p.speed / timeFactor;
+    if (
+      p.x < player.x + player.width &&
+      p.x + 24 > player.x &&
+      p.y < player.y + player.height &&
+      p.y + 24 > player.y
+    ) {
+      if (p.type === "multi") multiShotLevel = Math.min(multiShotLevel + 1, 6);
+      else if (p.type === "shield") player.shield = 300;
+      else if (p.type === "bomb") enemies.length = 0;
+      else if (p.type === "score") score += 20;
+      else if (p.type === "rapid") player.rapidFire = 600;
+      else if (p.type === "pierce") player.piercing = 600;
+      else if (p.type === "magnet") player.magnet = 600;
+      else if (p.type === "slow") slowMotion = 600;
+      powerUps.splice(i, 1);
+    } else if (player.magnet > 0 && Math.abs(p.x - player.x) < 100 && p.y < canvas.height) {
+      p.x += (player.x - p.x) * 0.05;
+      p.y += (player.y - p.y) * 0.05;
+    } else if (p.y > canvas.height) {
+      powerUps.splice(i, 1);
+    }
+  });
 }
 
 function draw() {
@@ -126,6 +225,7 @@ function draw() {
   drawPlayer();
   bullets.forEach(drawBullet);
   enemies.forEach(drawEnemy);
+  drawPowerUps();
 }
 
 function gameLoop() {
