@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Galaga Bar Blast</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+      color: white;
+      font-family: sans-serif;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #gameContainer {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #111;
+      border: 2px solid #ffcc00;
+      touch-action: none;
+    }
+    #hud {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 1.2em;
+    }
+    @media (max-width: 480px) {
+      #hud {
+        font-size: 1em;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">
+    <div>Score: <span id="score">0</span> | Lives: <span id="lives">3</span></div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  
+  // Set canvas dimensions
+  const GAME_WIDTH = 480;
+  const GAME_HEIGHT = 640;
+  canvas.width = GAME_WIDTH;
+  canvas.height = GAME_HEIGHT;
+  
+  // Handle canvas resizing
+  function resizeCanvas() {
+    const container = document.getElementById("gameContainer");
+    const containerWidth = container.clientWidth;
+    canvas.style.width = containerWidth + "px";
+    canvas.style.height = (containerWidth * (GAME_HEIGHT / GAME_WIDTH)) + "px";
+  }
+  
+  // Initial resize and add event listener for window resize
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  const drinkEmojis = ["🍺", "🍷", "🥃", "🍸", "🍹"];
+  const player = { x: GAME_WIDTH / 2 - 15, y: GAME_HEIGHT - 50, width: 30, height: 30, speed: 5 };
+  const bullets = [];
+  const enemies = [];
+  let score = 0;
+  let lives = 3;
+  let keys = {};
+  let shootCooldown = 0;
+  let enemySpawnRate = 2000;
+  let lastSpawnTime = 0;
+  let gameStartTime = Date.now();
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  function drawPlayer() {
+    ctx.fillStyle = "#00ffcc";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  function drawBullet(bullet) {
+    ctx.fillStyle = "#ffff00";
+    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+  }
+
+  function drawEnemy(enemy) {
+    ctx.font = "28px Arial";
+    ctx.fillText(enemy.emoji, enemy.x, enemy.y);
+  }
+
+  function spawnEnemy() {
+    const emoji = drinkEmojis[Math.floor(Math.random() * drinkEmojis.length)];
+    enemies.push({
+      x: Math.random() * (canvas.width - 30),
+      y: -30,
+      emoji: emoji,
+      speed: 0.2 + Math.random() * 0.3
+    });
+  }
+
+  function update() {
+    const now = Date.now();
+    const elapsed = now - gameStartTime;
+
+    if (now - lastSpawnTime > enemySpawnRate) {
+      for (let i = 0; i < Math.floor(elapsed / 10000) + 1; i++) {
+        spawnEnemy();
+      }
+      lastSpawnTime = now;
+      if (enemySpawnRate > 300) enemySpawnRate -= 25;
+    }
+
+    if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
+    if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += player.speed;
+
+    // Auto-shooting logic
+    if (shootCooldown <= 0) {
+      bullets.push({
+        x: player.x + player.width / 2 - 2,
+        y: player.y,
+        width: 4,
+        height: 10,
+        speed: 6
+      });
+      shootCooldown = 50;
+    } else {
+      shootCooldown -= 16;
+    }
+
+    bullets.forEach((b, i) => {
+      b.y -= b.speed;
+      if (b.y < 0) bullets.splice(i, 1);
+    });
+
+    enemies.forEach((e, i) => {
+      e.y += e.speed;
+      if (e.y > canvas.height) {
+        enemies.splice(i, 1);
+        lives--;
+        document.getElementById("lives").textContent = lives;
+        if (lives <= 0) {
+          alert("Game Over! Final Score: " + score);
+          document.location.reload();
+        }
+      }
+    });
+
+    bullets.forEach((b, bi) => {
+      enemies.forEach((e, ei) => {
+        if (
+          b.x < e.x + 24 &&
+          b.x + b.width > e.x &&
+          b.y < e.y + 24 &&
+          b.y + b.height > e.y
+        ) {
+          bullets.splice(bi, 1);
+          enemies.splice(ei, 1);
+          score++;
+          document.getElementById("score").textContent = score;
+        }
+      });
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPlayer();
+    bullets.forEach(drawBullet);
+    enemies.forEach(drawEnemy);
+  }
+
+  // Add orientation change handling for mobile
+  window.addEventListener("orientationchange", () => {
+    // Short delay to allow orientation to complete
+    setTimeout(resizeCanvas, 100);
+  });
+
+  // Prevent page scrolling on mobile
+  document.body.addEventListener("touchmove", (e) => {
+    if (e.target === canvas) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Prevent zooming on double tap on mobile
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+  
+  // Prevent context menu on long press
+  canvas.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    return false;
+  });
+
+  function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Setup keyboard controls
+  document.addEventListener("keydown", (e) => {
+    keys[e.key] = true;
+    // Prevent default behavior for arrow keys to avoid page scrolling
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+      e.preventDefault();
+    }
+  });
+  document.addEventListener("keyup", (e) => keys[e.key] = false);
+
+  // Convert screen coordinates to game coordinates
+  function getGameCoordinates(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  }
+
+  // Handle both mouse clicks and touch taps for player movement
+  function handlePointerDown(clientX, clientY) {
+    const coords = getGameCoordinates(clientX, clientY);
+    
+    // If tapping/clicking directly on the player, start dragging
+    if (coords.x >= player.x && coords.x <= player.x + player.width &&
+        coords.y >= player.y && coords.y <= player.y + player.height) {
+      isDragging = true;
+      dragOffsetX = coords.x - player.x;
+    } else if (isMobile) {
+      // On mobile, allow tapping anywhere to move the player
+      player.x = coords.x - player.width / 2;
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    }
+  }
+
+  function handlePointerMove(clientX, clientY) {
+    if (isDragging) {
+      const coords = getGameCoordinates(clientX, clientY);
+      player.x = coords.x - dragOffsetX;
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    }
+  }
+
+  function handlePointerUp() {
+    isDragging = false;
+  }
+
+  // Mouse events
+  canvas.addEventListener("mousedown", (e) => {
+    handlePointerDown(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    handlePointerMove(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener("mouseup", handlePointerUp);
+  canvas.addEventListener("mouseleave", handlePointerUp);
+
+  // Touch events
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  canvas.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    handlePointerUp();
+  }, { passive: false });
+
+  gameLoop();
+</script>
+
+</body>
+</html>
