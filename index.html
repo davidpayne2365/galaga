@@ -14,12 +14,17 @@
       font-family: sans-serif;
       width: 100%;
       height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     #gameContainer {
       position: relative;
       width: 100%;
-      height: 100vh;
-      margin: 0;
+      max-width: 480px;
+      height: 100%;
+      max-height: 640px;
+      margin: 0 auto;
     }
     #gameCanvas {
       display: block;
@@ -62,27 +67,36 @@
   canvas.width = GAME_WIDTH;
   canvas.height = GAME_HEIGHT;
   
-  // Handle canvas resizing
+  // Handle canvas resizing to ensure game is centered and properly scaled
   function resizeCanvas() {
     var container = document.getElementById("gameContainer");
-    var containerWidth = container.clientWidth;
-    var containerHeight = container.clientHeight;
+    var windowWidth = window.innerWidth;
+    var windowHeight = window.innerHeight;
     
-    // Maintain aspect ratio while fitting the screen
-    var canvasWidth, canvasHeight;
+    // Set a maximum size while maintaining aspect ratio
+    var gameRatio = GAME_HEIGHT / GAME_WIDTH;
+    var maxWidth = Math.min(windowWidth, 480);
+    var maxHeight = Math.min(windowHeight, 640);
     
-    if (containerWidth / containerHeight > GAME_WIDTH / GAME_HEIGHT) {
-      // Window is wider than game ratio
-      canvasHeight = containerHeight;
-      canvasWidth = containerHeight * (GAME_WIDTH / GAME_HEIGHT);
-    } else {
+    var containerWidth, containerHeight;
+    
+    if (maxHeight / maxWidth > gameRatio) {
       // Window is taller than game ratio
-      canvasWidth = containerWidth;
-      canvasHeight = containerWidth * (GAME_HEIGHT / GAME_WIDTH);
+      containerWidth = maxWidth;
+      containerHeight = containerWidth * gameRatio;
+    } else {
+      // Window is wider than game ratio
+      containerHeight = maxHeight;
+      containerWidth = containerHeight / gameRatio;
     }
     
-    canvas.style.width = canvasWidth + "px";
-    canvas.style.height = canvasHeight + "px";
+    // Apply sizes to container
+    container.style.width = containerWidth + "px";
+    container.style.height = containerHeight + "px";
+    
+    // Make canvas fill container
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
   }
   
   // Initial resize and add event listener for window resize
@@ -141,8 +155,14 @@
       if (enemySpawnRate > 300) enemySpawnRate -= 25;
     }
 
-    if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
-    if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += player.speed;
+    if (keys["ArrowLeft"]) {
+      player.x -= player.speed;
+      if (player.x < 0) player.x = 0;
+    }
+    if (keys["ArrowRight"]) {
+      player.x += player.speed;
+      if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+    }
 
     // Auto-shooting logic
     if (shootCooldown <= 0) {
@@ -221,14 +241,12 @@
     enemies.forEach(drawEnemy);
   }
 
-  // Convert screen coordinates to game coordinates
+  // Improve touch response by simplifying the coordinate conversion
   function getGameCoordinates(clientX, clientY) {
     var rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
     };
   }
 
@@ -236,20 +254,26 @@
   function handlePointerDown(clientX, clientY) {
     var coords = getGameCoordinates(clientX, clientY);
     
-    // Always move the player to the x position tapped/clicked
-    player.x = coords.x - player.width / 2;
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    // Move the player directly to the horizontal position tapped
+    movePlayerToPosition(coords.x);
     
-    // Start drag mode anyway to allow smooth movement
+    // Start drag mode for continuous movement
     isDragging = true;
-    dragOffsetX = player.width / 2; // Center the drag point
+    dragOffsetX = player.width / 2;
+  }
+
+  function movePlayerToPosition(x) {
+    // Move player to the x position, centering the player on that point
+    player.x = x - (player.width / 2);
+    
+    // Keep the player within the canvas bounds
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
   }
 
   function handlePointerMove(clientX, clientY) {
     if (isDragging) {
       var coords = getGameCoordinates(clientX, clientY);
-      player.x = coords.x - dragOffsetX;
-      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      movePlayerToPosition(coords.x);
     }
   }
 
