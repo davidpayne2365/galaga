@@ -277,7 +277,6 @@ function gameLoop() {
 
 gameLoop();
 
-// Restore keyboard control
 window.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") holdingLeft = true;
   if (e.key === "ArrowRight") holdingRight = true;
@@ -287,12 +286,18 @@ window.addEventListener("keyup", e => {
   if (e.key === "ArrowRight") holdingRight = false;
 });
 
-// Restore mouse/touch move control
 canvas.addEventListener("mousemove", e => {
   player.x = e.clientX - player.width / 2;
 });
 
 canvas.addEventListener("touchmove", e => {
+  if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    player.x = touch.clientX - player.width / 2;
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchstart", e => {
   if (e.touches.length > 0) {
     const touch = e.touches[0];
     player.x = touch.clientX - player.width / 2;
