@@ -286,18 +286,14 @@ window.addEventListener("keyup", e => {
   if (e.key === "ArrowRight") holdingRight = false;
 });
 
-canvas.addEventListener("mousemove", e => {
-  player.x = e.clientX - player.width / 2;
-});
-
-canvas.addEventListener("touchmove", e => {
+document.getElementById("touchControls").addEventListener("touchmove", e => {
   if (e.touches.length > 0) {
     const touch = e.touches[0];
     player.x = touch.clientX - player.width / 2;
   }
 }, { passive: false });
 
-canvas.addEventListener("touchstart", e => {
+document.getElementById("touchControls").addEventListener("touchstart", e => {
   if (e.touches.length > 0) {
     const touch = e.touches[0];
     player.x = touch.clientX - player.width / 2;
