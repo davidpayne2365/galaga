@@ -64,17 +64,10 @@
       margin-top: 4vw;
       font-size: 4vw;
     }
-    input[type=range] {
+    select {
       width: 100%;
-    }
-    .toggleLabel {
-      display: flex;
-      align-items: center;
       font-size: 4vw;
-      margin-top: 4vw;
-    }
-    .toggleLabel input {
-      margin-left: 2vw;
+      margin-top: 2vw;
     }
     #resetBtn, #resumeBtn {
       margin-top: 5vw; 
@@ -116,26 +109,6 @@
       border-radius: 10px;
       cursor: pointer;
     }
-    #touchControls {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 5;
-    }
-    #leftZone, #rightZone {
-      position: absolute;
-      top: 0;
-      width: 50%;
-      height: 100%;
-    }
-    #leftZone {
-      left: 0;
-    }
-    #rightZone {
-      right: 0;
-    }
   </style>
 </head>
 <body>
@@ -144,15 +117,12 @@
   <div id="lives">Lives: 10</div>
   <button id="settingsBtn">⚙️</button>
   <div id="settingsPanel">
-    <div class="settingLabel">Enemy Fall Speed: <span id="speedValue">1.0</span></div>
-    <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="1.0">
-  
-    <div class="settingLabel">Enemy Spawn Rate: <span id="spawnValue">0.02</span></div>
-    <input type="range" id="spawnSlider" min="0.01" max="0.1" step="0.01" value="0.02">
-  
-    <label class="toggleLabel">Drag to Move
-      <input type="checkbox" id="dragToggle">
-    </label>
+    <div class="settingLabel">Difficulty:</div>
+    <select id="difficultySelect">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
     <button id="resetBtn">Reset to Defaults</button>
     <div id="saveMsg">Settings Saved!</div>
     <button id="resumeBtn">Resume</button>
@@ -160,10 +130,6 @@
   <div id="gameOverScreen">
     <div id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
-  </div>
-  <div id="touchControls">
-    <div id="leftZone"></div>
-    <div id="rightZone"></div>
   </div>
   <audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
   
@@ -177,22 +143,28 @@
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
+  
+    // Default difficulty settings (Easy)
     let enemyFallSpeed = 1.0;
     let enemySpawnRate = 0.02;
-    let useDragControl = false;
-    let isPaused = false;
   
+    // Difficulty presets
+    const difficultySettings = {
+      easy: { enemyFallSpeed: 1.0, enemySpawnRate: 0.02 },
+      medium: { enemyFallSpeed: 2.0, enemySpawnRate: 0.05 },
+      hard: { enemyFallSpeed: 3.0, enemySpawnRate: 0.1 }
+    };
+  
+    // Player and easing target
     const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
+    let targetX = player.x;
+  
     const bullets = [];
     const enemies = [];
     let shootTimer = 0;
     let enableGlow = false;
     let allColorsFired = new Set();
     const rainbowSound = document.getElementById("rainbowSound");
-  
-    // Variables for left/right controls when not using drag mode
-    let holdingLeft = false;
-    let holdingRight = false;
   
     const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
   
@@ -278,7 +250,7 @@
     }
   
     function update() {
-      if (gameOver || isPaused) return;
+      if (gameOver) return;
   
       if (Math.random() < enemySpawnRate) spawnEnemy();
   
@@ -331,12 +303,10 @@
         }
       }
   
-      // Update player movement in left/right mode
-      if (!useDragControl) {
-        if (holdingLeft) player.x -= 5;
-        if (holdingRight) player.x += 5;
-        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-      }
+      // Easing movement: gradually move player.x towards targetX
+      player.x += (targetX - player.x) * 0.1;
+      // Keep player within bounds
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
     }
   
     function draw() {
@@ -362,80 +332,40 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
   
-    // Load saved settings from localStorage
-    const savedSpeed = localStorage.getItem("enemyFallSpeed");
-    if (savedSpeed !== null) {
-      enemyFallSpeed = parseFloat(savedSpeed);
-      document.getElementById("speedSlider").value = enemyFallSpeed;
-      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-    }
-  
-    const savedSpawn = localStorage.getItem("enemySpawnRate");
-    if (savedSpawn !== null) {
-      enemySpawnRate = parseFloat(savedSpawn);
-      document.getElementById("spawnSlider").value = enemySpawnRate;
-      document.getElementById("spawnValue").textContent = enemySpawnRate;
-    }
-  
-    const savedDrag = localStorage.getItem("useDragControl");
-    if (savedDrag !== null) {
-      useDragControl = savedDrag === "true";
-      document.getElementById("dragToggle").checked = useDragControl;
-    }
+    // Load saved difficulty from localStorage (if any)
+    const savedDifficulty = localStorage.getItem("difficulty") || "easy";
+    document.getElementById("difficultySelect").value = savedDifficulty;
+    ({ enemyFallSpeed, enemySpawnRate } = difficultySettings[savedDifficulty]);
   
     gameLoop();
   
     // Settings panel event listeners
     document.getElementById("settingsBtn").addEventListener("click", () => {
       const panel = document.getElementById("settingsPanel");
-      isPaused = panel.style.display !== "block";
-      panel.style.display = isPaused ? "block" : "none";
+      // Toggle pause state when settings panel is visible
+      panel.style.display = panel.style.display === "block" ? "none" : "block";
     });
   
-    document.getElementById("speedSlider").addEventListener("input", e => {
-      enemyFallSpeed = parseFloat(e.target.value);
-      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-      localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
-    });
-  
-    document.getElementById("spawnSlider").addEventListener("input", e => {
-      enemySpawnRate = parseFloat(e.target.value);
-      document.getElementById("spawnValue").textContent = enemySpawnRate;
-      localStorage.setItem("enemySpawnRate", enemySpawnRate);
-    });
-  
-    document.getElementById("dragToggle").addEventListener("change", e => {
-      useDragControl = e.target.checked;
-      localStorage.setItem("useDragControl", useDragControl);
-      // Clear left/right control flags when switching modes
-      if (useDragControl) {
-        holdingLeft = false;
-        holdingRight = false;
-      }
-    });
-  
-    document.getElementById("resumeBtn").addEventListener("click", () => {
-      isPaused = false;
-      document.getElementById("settingsPanel").style.display = "none";
+    document.getElementById("difficultySelect").addEventListener("change", e => {
+      const selected = e.target.value;
+      const settings = difficultySettings[selected];
+      enemyFallSpeed = settings.enemyFallSpeed;
+      enemySpawnRate = settings.enemySpawnRate;
+      localStorage.setItem("difficulty", selected);
       showSaveMessage();
     });
   
     document.getElementById("resetBtn").addEventListener("click", () => {
-      enemyFallSpeed = 1.0;
-      enemySpawnRate = 0.02;
-      useDragControl = false;
+      // Reset to easy mode defaults
+      document.getElementById("difficultySelect").value = "easy";
+      enemyFallSpeed = difficultySettings.easy.enemyFallSpeed;
+      enemySpawnRate = difficultySettings.easy.enemySpawnRate;
+      localStorage.setItem("difficulty", "easy");
+      showSaveMessage();
+    });
   
-      document.getElementById("speedSlider").value = enemyFallSpeed;
-      document.getElementById("spawnSlider").value = enemySpawnRate;
-      document.getElementById("dragToggle").checked = useDragControl;
-  
-      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-      document.getElementById("spawnValue").textContent = enemySpawnRate;
-  
-      localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
-      localStorage.setItem("enemySpawnRate", enemySpawnRate);
-      localStorage.setItem("useDragControl", useDragControl);
-  
+    document.getElementById("resumeBtn").addEventListener("click", () => {
+      document.getElementById("settingsPanel").style.display = "none";
       showSaveMessage();
     });
   
@@ -445,53 +375,18 @@
       setTimeout(() => msg.style.display = "none", 2000);
     }
   
-    // Player control event listeners
-  
-    // Mouse move (only if drag mode is enabled)
+    // Player control event listeners -- easing follow mode
     canvas.addEventListener("mousemove", e => {
-      if (useDragControl) {
-        player.x = e.clientX - player.width / 2;
-        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-      }
+      targetX = e.clientX - player.width / 2;
     });
   
-    // Touch move (only if drag mode is enabled)
     canvas.addEventListener("touchmove", e => {
-      if (useDragControl && e.touches.length > 0) {
+      if (e.touches.length > 0) {
         const touch = e.touches[0];
-        player.x = touch.clientX - player.width / 2;
-        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+        targetX = touch.clientX - player.width / 2;
         e.preventDefault();
       }
     }, { passive: false });
-  
-    // Left/right touch zones (only active if drag mode is off)
-    document.getElementById("leftZone").addEventListener("touchstart", () => {
-      if (!useDragControl) holdingLeft = true;
-    });
-    document.getElementById("leftZone").addEventListener("touchend", () => {
-      if (!useDragControl) holdingLeft = false;
-    });
-    document.getElementById("rightZone").addEventListener("touchstart", () => {
-      if (!useDragControl) holdingRight = true;
-    });
-    document.getElementById("rightZone").addEventListener("touchend", () => {
-      if (!useDragControl) holdingRight = false;
-    });
-  
-    // Keyboard controls (only if drag mode is off)
-    window.addEventListener("keydown", e => {
-      if (!useDragControl) {
-        if (e.key === "ArrowLeft") holdingLeft = true;
-        if (e.key === "ArrowRight") holdingRight = true;
-      }
-    });
-    window.addEventListener("keyup", e => {
-      if (!useDragControl) {
-        if (e.key === "ArrowLeft") holdingLeft = false;
-        if (e.key === "ArrowRight") holdingRight = false;
-      }
-    });
   </script>
 </body>
 </html>
