@@ -190,6 +190,7 @@
     let allColorsFired = new Set();
     const rainbowSound = document.getElementById("rainbowSound");
   
+    // Variables for left/right controls when not using drag mode
     let holdingLeft = false;
     let holdingRight = false;
   
@@ -315,7 +316,7 @@
         }
       }
   
-      // Check for collisions
+      // Check for collisions between bullets and enemies
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
         const b = bullets[bi];
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -330,7 +331,7 @@
         }
       }
   
-      // Player movement control
+      // Update player movement in left/right mode
       if (!useDragControl) {
         if (holdingLeft) player.x -= 5;
         if (holdingRight) player.x += 5;
@@ -384,7 +385,7 @@
   
     gameLoop();
   
-    // Event listeners for settings panel
+    // Settings panel event listeners
     document.getElementById("settingsBtn").addEventListener("click", () => {
       const panel = document.getElementById("settingsPanel");
       isPaused = panel.style.display !== "block";
@@ -406,16 +407,19 @@
     document.getElementById("dragToggle").addEventListener("change", e => {
       useDragControl = e.target.checked;
       localStorage.setItem("useDragControl", useDragControl);
+      // Clear left/right control flags when switching modes
+      if (useDragControl) {
+        holdingLeft = false;
+        holdingRight = false;
+      }
     });
   
-    // Resume button in settings panel
     document.getElementById("resumeBtn").addEventListener("click", () => {
       isPaused = false;
       document.getElementById("settingsPanel").style.display = "none";
       showSaveMessage();
     });
   
-    // Reset to defaults button in settings panel
     document.getElementById("resetBtn").addEventListener("click", () => {
       enemyFallSpeed = 1.0;
       enemySpawnRate = 0.02;
@@ -441,9 +445,9 @@
       setTimeout(() => msg.style.display = "none", 2000);
     }
   
-    // Event listeners for player control
+    // Player control event listeners
   
-    // Mouse move for drag control
+    // Mouse move (only if drag mode is enabled)
     canvas.addEventListener("mousemove", e => {
       if (useDragControl) {
         player.x = e.clientX - player.width / 2;
@@ -451,16 +455,17 @@
       }
     });
   
-    // Touch move for drag control
+    // Touch move (only if drag mode is enabled)
     canvas.addEventListener("touchmove", e => {
       if (useDragControl && e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
         player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+        e.preventDefault();
       }
     }, { passive: false });
   
-    // Touch controls for left/right zones when not using drag control
+    // Left/right touch zones (only active if drag mode is off)
     document.getElementById("leftZone").addEventListener("touchstart", () => {
       if (!useDragControl) holdingLeft = true;
     });
@@ -474,7 +479,7 @@
       if (!useDragControl) holdingRight = false;
     });
   
-    // Keyboard controls for left/right arrow keys (when not using drag control)
+    // Keyboard controls (only if drag mode is off)
     window.addEventListener("keydown", e => {
       if (!useDragControl) {
         if (e.key === "ArrowLeft") holdingLeft = true;
