@@ -428,6 +428,44 @@ document.getElementById("resetBtn").addEventListener("click", () => {
 
   showSaveMessage();
 });
+
+
+
+
+canvas.addEventListener("mousemove", e => {
+  if (useDragControl) {
+    player.x = e.clientX - player.width / 2;
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  }
+});
+
+canvas.addEventListener("touchmove", e => {
+  if (useDragControl && e.touches.length > 0) {
+    const touch = e.touches[0];
+    player.x = touch.clientX - player.width / 2;
+  }
+}, { passive: false });
+
+document.getElementById("leftZone").addEventListener("touchstart", () => {
+  if (!useDragControl) holdingLeft = true;
+});
+document.getElementById("leftZone").addEventListener("touchend", () => {
+  if (!useDragControl) holdingLeft = false;
+});
+document.getElementById("rightZone").addEventListener("touchstart", () => {
+  if (!useDragControl) holdingRight = true;
+});
+document.getElementById("rightZone").addEventListener("touchend", () => {
+  if (!useDragControl) holdingRight = false;
+});
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") holdingLeft = true;
+  if (e.key === "ArrowRight") holdingRight = true;
+});
+window.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") holdingLeft = false;
+  if (e.key === "ArrowRight") holdingRight = false;
+});
 </script>
 
 </body>
