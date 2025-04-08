@@ -37,6 +37,55 @@
       font-size: 4vw;
       color: white;
     }
+    #settingsBtn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 15;
+      font-size: 6vw;
+      color: white;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    #settingsPanel {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 80vw;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 4vw;
+      z-index: 30;
+    }
+    .settingLabel {
+      margin-top: 4vw;
+      font-size: 4vw;
+    }
+    input[type=range] {
+      width: 100%;
+    }
+    .toggleLabel {
+      display: flex;
+      align-items: center;
+      font-size: 4vw;
+      margin-top: 4vw;
+    }
+    .toggleLabel input {
+      margin-left: 2vw;
+    }
+    #resumeBtn {
+      margin-top: 5vw;
+      padding: 2vw 4vw;
+      font-size: 4vw;
+      background-color: #444;
+      color: white;
+      border: 1px solid white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
     #gameOverScreen {
       display: none;
       position: fixed;
@@ -88,6 +137,29 @@
 <canvas id="gameCanvas"></canvas>
 <div id="score">0</div>
 <div id="lives">Lives: 10</div>
+<button id="settingsBtn">⚙️</button>
+<div id="settingsPanel">
+  <div class="settingLabel">Enemy Fall Speed: <span id="speedValue">1.0</span></div>
+  <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="1.0">
+
+  <div class="settingLabel">Enemy Spawn Rate: <span id="spawnValue">0.02</span></div>
+  <input type="range" id="spawnSlider" min="0.01" max="0.1" step="0.01" value="0.02">
+
+  <label class="toggleLabel">Drag to Move
+    <input type="checkbox" id="dragToggle">
+  </label>
+
+  <button id="resetBtn" style="margin-top: 5vw; padding: 2vw 4vw; font-size: 4vw; background-color: #222; color: white; border: 1px solid white; border-radius: 8px; cursor: pointer;">Reset to Defaults</button>
+  <div id="saveMsg" style="margin-top: 3vw; font-size: 3.5vw; color: lightgreen; display: none;">Settings Saved!</div>
+
+  <button id="resumeBtn">Resume</button>
+</div>
+
+  <button id="resetBtn" style="margin-top: 5vw; padding: 2vw 4vw; font-size: 4vw; background-color: #222; color: white; border: 1px solid white; border-radius: 8px; cursor: pointer;">Reset to Defaults</button>
+  <div id="saveMsg" style="margin-top: 3vw; font-size: 3.5vw; color: lightgreen; display: none;">Settings Saved!</div>
+
+  <button id="resumeBtn">Resume</button>
+</div>
 <div id="gameOverScreen">
   <div id="gameOverMessage"></div>
   <button id="restartBtn" onclick="location.reload()">Restart</button>
@@ -108,6 +180,10 @@ let score = 0;
 let lives = 10;
 let highScore = localStorage.getItem("highScore") || 0;
 let gameOver = false;
+let enemyFallSpeed = 1.0;
+let enemySpawnRate = 0.02;
+let useDragControl = false;
+let isPaused = false;
 
 const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
 const bullets = [];
@@ -119,7 +195,6 @@ const rainbowSound = document.getElementById("rainbowSound");
 
 let holdingLeft = false;
 let holdingRight = false;
-let dragging = false;
 
 const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
 
@@ -180,7 +255,7 @@ function drawEnemy(e) {
 
 function spawnEnemy() {
   const speedMultiplier = 1 + (Math.floor(score / 100) * 0.3);
-  enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: speedMultiplier });
+  enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: speedMultiplier * enemyFallSpeed });
 }
 
 function shoot() {
@@ -205,9 +280,9 @@ function endGame() {
 }
 
 function update() {
-  if (gameOver) return;
+  if (gameOver || isPaused) return;
 
-  if (Math.random() < 0.02) spawnEnemy();
+  if (Math.random() < enemySpawnRate) spawnEnemy();
 
   if (shootTimer <= 0) {
     shoot();
@@ -248,9 +323,11 @@ function update() {
     });
   });
 
-  if (holdingLeft) player.x -= 5;
-  if (holdingRight) player.x += 5;
-  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  if (!useDragControl) {
+    if (holdingLeft) player.x -= 5;
+    if (holdingRight) player.x += 5;
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  }
 }
 
 function draw() {
@@ -276,57 +353,81 @@ function gameLoop() {
   if (!gameOver) requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
-
-window.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft") holdingLeft = true;
-  if (e.key === "ArrowRight") holdingRight = true;
-});
-
-window.addEventListener("keyup", e => {
-  if (e.key === "ArrowLeft") holdingLeft = false;
-  if (e.key === "ArrowRight") holdingRight = false;
-});
-
-canvas.addEventListener("mousemove", e => {
-  player.x = e.clientX - player.width / 2;
-});
-
-const touchControls = document.getElementById("touchControls");
-const leftZone = document.getElementById("leftZone");
-const rightZone = document.getElementById("rightZone");
-
-function isInZone(touch, zone) {
-  const rect = zone.getBoundingClientRect();
-  return touch.clientX >= rect.left && touch.clientX <= rect.right &&
-         touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+// Load saved settings
+const savedSpeed = localStorage.getItem("enemyFallSpeed");
+if (savedSpeed !== null) {
+  enemyFallSpeed = parseFloat(savedSpeed);
+  document.getElementById("speedSlider").value = enemyFallSpeed;
+  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
 }
 
-touchControls.addEventListener("touchstart", e => {
-  if (e.touches.length > 0) {
-    const touch = e.touches[0];
-    if (!isInZone(touch, leftZone) && !isInZone(touch, rightZone)) {
-      dragging = true;
-      player.x = touch.clientX - player.width / 2;
-    }
-  }
-}, { passive: false });
+const savedSpawn = localStorage.getItem("enemySpawnRate");
+if (savedSpawn !== null) {
+  enemySpawnRate = parseFloat(savedSpawn);
+  document.getElementById("spawnSlider").value = enemySpawnRate;
+  document.getElementById("spawnValue").textContent = enemySpawnRate;
+}
 
-touchControls.addEventListener("touchmove", e => {
-  if (dragging && e.touches.length > 0) {
-    const touch = e.touches[0];
-    player.x = touch.clientX - player.width / 2;
-  }
-}, { passive: false });
+const savedDrag = localStorage.getItem("useDragControl");
+if (savedDrag !== null) {
+  useDragControl = savedDrag === "true";
+  document.getElementById("dragToggle").checked = useDragControl;
+}
 
-touchControls.addEventListener("touchend", () => {
-  dragging = false;
+gameLoop();
+
+document.getElementById("settingsBtn").addEventListener("click", () => {
+  const panel = document.getElementById("settingsPanel");
+  isPaused = panel.style.display !== "block";
+  panel.style.display = isPaused ? "block" : "none";
 });
 
-leftZone.addEventListener("touchstart", () => holdingLeft = true);
-leftZone.addEventListener("touchend", () => holdingLeft = false);
-rightZone.addEventListener("touchstart", () => holdingRight = true);
-rightZone.addEventListener("touchend", () => holdingRight = false);
+document.getElementById("speedSlider").addEventListener("input", e => {
+  enemyFallSpeed = parseFloat(e.target.value);
+  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
+  localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
+});
+
+document.getElementById("spawnSlider").addEventListener("input", e => {
+  enemySpawnRate = parseFloat(e.target.value);
+  document.getElementById("spawnValue").textContent = enemySpawnRate;
+  localStorage.setItem("enemySpawnRate", enemySpawnRate);
+});
+
+document.getElementById("dragToggle").addEventListener("change", e => {
+  useDragControl = e.target.checked;
+  localStorage.setItem("useDragControl", useDragControl);
+});
+
+document.getElementById("resumeBtn").addEventListener("click", () => {
+  isPaused = false;
+  document.getElementById("settingsPanel").style.display = "none";
+  showSaveMessage();
+});
+function showSaveMessage() {
+  const msg = document.getElementById("saveMsg");
+  msg.style.display = "block";
+  setTimeout(() => msg.style.display = "none", 2000);
+}
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  enemyFallSpeed = 1.0;
+  enemySpawnRate = 0.02;
+  useDragControl = false;
+
+  document.getElementById("speedSlider").value = enemyFallSpeed;
+  document.getElementById("spawnSlider").value = enemySpawnRate;
+  document.getElementById("dragToggle").checked = useDragControl;
+
+  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
+  document.getElementById("spawnValue").textContent = enemySpawnRate;
+
+  localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
+  localStorage.setItem("enemySpawnRate", enemySpawnRate);
+  localStorage.setItem("useDragControl", useDragControl);
+
+  showSaveMessage();
+});
 </script>
 
 </body>
