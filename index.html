@@ -132,45 +132,42 @@
     <button id="restartBtn" onclick="location.reload()">Restart</button>
   </div>
   <audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
-  
+
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-  
+
     let score = 0;
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
-  
-    // Default difficulty settings (Easy)
+    let paused = false;
+
     let enemyFallSpeed = 1.0;
     let enemySpawnRate = 0.02;
-  
-    // Difficulty presets
+
     const difficultySettings = {
       easy: { enemyFallSpeed: 1.0, enemySpawnRate: 0.02 },
       medium: { enemyFallSpeed: 2.0, enemySpawnRate: 0.05 },
       hard: { enemyFallSpeed: 3.0, enemySpawnRate: 0.1 }
     };
-  
-    // Player and easing target
+
     const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
     let targetX = player.x;
-  
-    // Bullet speed has been increased now
+
     const bulletSpeed = 10;
-  
+
     const bullets = [];
     const enemies = [];
     let shootTimer = 0;
     let enableGlow = false;
     let allColorsFired = new Set();
     const rainbowSound = document.getElementById("rainbowSound");
-  
+
     const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
-  
+
     const castleSources = [
       "castle_red.png",
       "castle_orange.png",
@@ -181,11 +178,11 @@
       "castle_violet.png",
       "castle_rainbow.png"
     ];
-  
+
     const castleImages = [];
     let allImagesLoaded = false;
     let loadedCount = 0;
-  
+
     castleSources.forEach((src, i) => {
       const img = new Image();
       img.onload = () => {
@@ -196,11 +193,11 @@
       img.src = src;
       castleImages[i] = img;
     });
-  
+
     function getCurrentCastleIndex() {
       return Math.min(Math.floor(score / 100), castleImages.length - 1);
     }
-  
+
     function drawPlayer() {
       ctx.fillStyle = player.color;
       ctx.beginPath();
@@ -210,70 +207,35 @@
       ctx.closePath();
       ctx.fill();
     }
-  
-    function drawBullet(b) {
-      ctx.save();
-      ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
-      ctx.shadowBlur = enableGlow ? 15 : 0;
-      ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
-      ctx.fillStyle = b.color || "yellow";
-      ctx.fillRect(b.x, b.y, 4, 10);
-      ctx.restore();
-    }
-  
-    function drawEnemy(e) {
-      ctx.font = "24px Arial";
-      ctx.fillText("🍺", e.x, e.y);
-    }
-  
-    function spawnEnemy() {
-      const speedMultiplier = 1 + (Math.floor(score / 100) * 0.3);
-      enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: speedMultiplier * enemyFallSpeed });
-    }
-  
-    function shoot() {
-      const bulletCount = 1 + Math.floor(score / 100);
-      for (let i = 0; i < bulletCount; i++) {
-        const offset = (i - (bulletCount - 1) / 2) * 10;
-        const color = rainbowColors[i % rainbowColors.length];
-        bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
-        allColorsFired.add(color);
-      }
-      if (!enableGlow && allColorsFired.size >= 6) {
-        enableGlow = true;
-        rainbowSound.play();
-      }
-    }
-  
-    function endGame() {
-      gameOver = true;
-      document.getElementById("gameOverMessage").innerHTML =
-        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-      document.getElementById("gameOverScreen").style.display = "block";
-    }
-  
+
     function update() {
-      if (gameOver) return;
-  
-      if (Math.random() < enemySpawnRate) spawnEnemy();
-  
+      if (gameOver || paused) return;
+
+      if (Math.random() < enemySpawnRate) enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: enemyFallSpeed });
+
       if (shootTimer <= 0) {
-        shoot();
+        const bulletCount = 1 + Math.floor(score / 100);
+        for (let i = 0; i < bulletCount; i++) {
+          const offset = (i - (bulletCount - 1) / 2) * 10;
+          const color = rainbowColors[i % rainbowColors.length];
+          bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
+          allColorsFired.add(color);
+        }
+        if (!enableGlow && allColorsFired.size >= 6) {
+          enableGlow = true;
+          rainbowSound.play();
+        }
         shootTimer = 10;
       } else {
         shootTimer--;
       }
-  
-      // Update bullets with increased bullet speed
+
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.y -= bulletSpeed;
-        if (b.y < 0) {
-          bullets.splice(i, 1);
-        }
+        if (b.y < 0) bullets.splice(i, 1);
       }
-  
-      // Update enemies
+
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         e.y += e.speed;
@@ -286,12 +248,13 @@
               highScore = score;
               localStorage.setItem("highScore", highScore);
             }
-            endGame();
+            gameOver = true;
+            document.getElementById("gameOverMessage").innerHTML = `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+            document.getElementById("gameOverScreen").style.display = "block";
           }
         }
       }
-  
-      // Check for collisions between bullets and enemies
+
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
         const b = bullets[bi];
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -305,83 +268,83 @@
           }
         }
       }
-  
-      // Easing movement: gradually move player's x toward targetX
-      player.x += (targetX - player.x) * 0.1;
-      // Keep player within bounds
+
+      player.x = targetX; // Instant follow, no lag
       player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
     }
-  
+
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (allImagesLoaded) {
-        const bg = castleImages[getCurrentCastleIndex()];
-        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-      }
-  
+      if (allImagesLoaded) ctx.drawImage(castleImages[getCurrentCastleIndex()], 0, 0, canvas.width, canvas.height);
       if (enableGlow) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-  
       drawPlayer();
-      bullets.forEach(drawBullet);
-      enemies.forEach(drawEnemy);
+      bullets.forEach(b => {
+        ctx.save();
+        ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
+        ctx.shadowBlur = enableGlow ? 15 : 0;
+        ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
+        ctx.fillStyle = b.color || "yellow";
+        ctx.fillRect(b.x, b.y, 4, 10);
+        ctx.restore();
+      });
+      enemies.forEach(e => {
+        ctx.font = "24px Arial";
+        ctx.fillText("🍺", e.x, e.y);
+      });
     }
-  
+
     function gameLoop() {
       update();
       draw();
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
-  
-    // Load saved difficulty from localStorage (if any)
-    const savedDifficulty = localStorage.getItem("difficulty") || "easy";
-    document.getElementById("difficultySelect").value = savedDifficulty;
-    ({ enemyFallSpeed, enemySpawnRate } = difficultySettings[savedDifficulty]);
-  
-    gameLoop();
-  
-    // Settings panel event listeners
+
+    document.getElementById("difficultySelect").value = localStorage.getItem("difficulty") || "easy";
+    ({ enemyFallSpeed, enemySpawnRate } = difficultySettings[document.getElementById("difficultySelect").value]);
+
     document.getElementById("settingsBtn").addEventListener("click", () => {
       const panel = document.getElementById("settingsPanel");
-      panel.style.display = panel.style.display === "block" ? "none" : "block";
+      const isOpen = panel.style.display === "block";
+      panel.style.display = isOpen ? "none" : "block";
+      paused = !isOpen;
     });
-  
+
     document.getElementById("difficultySelect").addEventListener("change", e => {
       const selected = e.target.value;
       const settings = difficultySettings[selected];
       enemyFallSpeed = settings.enemyFallSpeed;
       enemySpawnRate = settings.enemySpawnRate;
       localStorage.setItem("difficulty", selected);
-      showSaveMessage();
+      const msg = document.getElementById("saveMsg");
+      msg.style.display = "block";
+      setTimeout(() => msg.style.display = "none", 2000);
     });
-  
+
     document.getElementById("resetBtn").addEventListener("click", () => {
-      // Reset to easy mode defaults
       document.getElementById("difficultySelect").value = "easy";
       enemyFallSpeed = difficultySettings.easy.enemyFallSpeed;
       enemySpawnRate = difficultySettings.easy.enemySpawnRate;
       localStorage.setItem("difficulty", "easy");
-      showSaveMessage();
-    });
-  
-    document.getElementById("resumeBtn").addEventListener("click", () => {
-      document.getElementById("settingsPanel").style.display = "none";
-      showSaveMessage();
-    });
-  
-    function showSaveMessage() {
       const msg = document.getElementById("saveMsg");
       msg.style.display = "block";
       setTimeout(() => msg.style.display = "none", 2000);
-    }
-  
-    // Player control event listeners (using easing follow mode)
+    });
+
+    document.getElementById("resumeBtn").addEventListener("click", () => {
+      document.getElementById("settingsPanel").style.display = "none";
+      paused = false;
+      const msg = document.getElementById("saveMsg");
+      msg.style.display = "block";
+      setTimeout(() => msg.style.display = "none", 2000);
+    });
+
     canvas.addEventListener("mousemove", e => {
       targetX = e.clientX - player.width / 2;
     });
-  
+
     canvas.addEventListener("touchmove", e => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
@@ -389,6 +352,8 @@
         e.preventDefault();
       }
     }, { passive: false });
+
+    gameLoop();
   </script>
 </body>
 </html>
