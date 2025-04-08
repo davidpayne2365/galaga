@@ -119,6 +119,7 @@ const rainbowSound = document.getElementById("rainbowSound");
 
 let holdingLeft = false;
 let holdingRight = false;
+let dragging = false;
 
 const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
 
@@ -281,29 +282,51 @@ window.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") holdingLeft = true;
   if (e.key === "ArrowRight") holdingRight = true;
 });
+
 window.addEventListener("keyup", e => {
   if (e.key === "ArrowLeft") holdingLeft = false;
   if (e.key === "ArrowRight") holdingRight = false;
 });
 
-document.getElementById("touchControls").addEventListener("touchmove", e => {
+canvas.addEventListener("mousemove", e => {
+  player.x = e.clientX - player.width / 2;
+});
+
+const touchControls = document.getElementById("touchControls");
+const leftZone = document.getElementById("leftZone");
+const rightZone = document.getElementById("rightZone");
+
+function isInZone(touch, zone) {
+  const rect = zone.getBoundingClientRect();
+  return touch.clientX >= rect.left && touch.clientX <= rect.right &&
+         touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+}
+
+touchControls.addEventListener("touchstart", e => {
   if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    if (!isInZone(touch, leftZone) && !isInZone(touch, rightZone)) {
+      dragging = true;
+      player.x = touch.clientX - player.width / 2;
+    }
+  }
+}, { passive: false });
+
+touchControls.addEventListener("touchmove", e => {
+  if (dragging && e.touches.length > 0) {
     const touch = e.touches[0];
     player.x = touch.clientX - player.width / 2;
   }
 }, { passive: false });
 
-document.getElementById("touchControls").addEventListener("touchstart", e => {
-  if (e.touches.length > 0) {
-    const touch = e.touches[0];
-    player.x = touch.clientX - player.width / 2;
-  }
-}, { passive: false });
+touchControls.addEventListener("touchend", () => {
+  dragging = false;
+});
 
-document.getElementById("leftZone").addEventListener("touchstart", () => holdingLeft = true);
-document.getElementById("leftZone").addEventListener("touchend", () => holdingLeft = false);
-document.getElementById("rightZone").addEventListener("touchstart", () => holdingRight = true);
-document.getElementById("rightZone").addEventListener("touchend", () => holdingRight = false);
+leftZone.addEventListener("touchstart", () => holdingLeft = true);
+leftZone.addEventListener("touchend", () => holdingLeft = false);
+rightZone.addEventListener("touchstart", () => holdingRight = true);
+rightZone.addEventListener("touchend", () => holdingRight = false);
 </script>
 
 </body>
