@@ -76,15 +76,21 @@
     .toggleLabel input {
       margin-left: 2vw;
     }
-    #resumeBtn {
-      margin-top: 5vw;
-      padding: 2vw 4vw;
-      font-size: 4vw;
-      background-color: #444;
-      color: white;
-      border: 1px solid white;
-      border-radius: 8px;
+    #resetBtn, #resumeBtn {
+      margin-top: 5vw; 
+      padding: 2vw 4vw; 
+      font-size: 4vw; 
+      background-color: #222; 
+      color: white; 
+      border: 1px solid white; 
+      border-radius: 8px; 
       cursor: pointer;
+    }
+    #saveMsg {
+      margin-top: 3vw;
+      font-size: 3.5vw;
+      color: lightgreen;
+      display: none;
     }
     #gameOverScreen {
       display: none;
@@ -133,340 +139,354 @@
   </style>
 </head>
 <body>
-
-<canvas id="gameCanvas"></canvas>
-<div id="score">0</div>
-<div id="lives">Lives: 10</div>
-<button id="settingsBtn">⚙️</button>
-<div id="settingsPanel">
-  <div class="settingLabel">Enemy Fall Speed: <span id="speedValue">1.0</span></div>
-  <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="1.0">
-
-  <div class="settingLabel">Enemy Spawn Rate: <span id="spawnValue">0.02</span></div>
-  <input type="range" id="spawnSlider" min="0.01" max="0.1" step="0.01" value="0.02">
-
-  <label class="toggleLabel">Drag to Move
-    <input type="checkbox" id="dragToggle">
-  </label>
-
-  <button id="resetBtn" style="margin-top: 5vw; padding: 2vw 4vw; font-size: 4vw; background-color: #222; color: white; border: 1px solid white; border-radius: 8px; cursor: pointer;">Reset to Defaults</button>
-  <div id="saveMsg" style="margin-top: 3vw; font-size: 3.5vw; color: lightgreen; display: none;">Settings Saved!</div>
-
-  <button id="resumeBtn">Resume</button>
-</div>
-
-  <button id="resetBtn" style="margin-top: 5vw; padding: 2vw 4vw; font-size: 4vw; background-color: #222; color: white; border: 1px solid white; border-radius: 8px; cursor: pointer;">Reset to Defaults</button>
-  <div id="saveMsg" style="margin-top: 3vw; font-size: 3.5vw; color: lightgreen; display: none;">Settings Saved!</div>
-
-  <button id="resumeBtn">Resume</button>
-</div>
-<div id="gameOverScreen">
-  <div id="gameOverMessage"></div>
-  <button id="restartBtn" onclick="location.reload()">Restart</button>
-</div>
-<div id="touchControls">
-  <div id="leftZone"></div>
-  <div id="rightZone"></div>
-</div>
-<audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
-
-<script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-let score = 0;
-let lives = 10;
-let highScore = localStorage.getItem("highScore") || 0;
-let gameOver = false;
-let enemyFallSpeed = 1.0;
-let enemySpawnRate = 0.02;
-let useDragControl = false;
-let isPaused = false;
-
-const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
-const bullets = [];
-const enemies = [];
-let shootTimer = 0;
-let enableGlow = false;
-let allColorsFired = new Set();
-const rainbowSound = document.getElementById("rainbowSound");
-
-let holdingLeft = false;
-let holdingRight = false;
-
-const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
-
-const castleSources = [
-  "castle_red.png",
-  "castle_orange.png",
-  "castle_yellow.png",
-  "castle_green.png",
-  "castle_blue.png",
-  "castle_indigo.png",
-  "castle_violet.png",
-  "castle_rainbow.png"
-];
-
-const castleImages = [];
-let allImagesLoaded = false;
-let loadedCount = 0;
-
-castleSources.forEach((src, i) => {
-  const img = new Image();
-  img.onload = () => {
-    loadedCount++;
-    if (loadedCount === castleSources.length) allImagesLoaded = true;
-  };
-  img.onerror = () => console.error("Image failed to load:", src);
-  img.src = src;
-  castleImages[i] = img;
-});
-
-function getCurrentCastleIndex() {
-  return Math.min(Math.floor(score / 100), castleImages.length - 1);
-}
-
-function drawPlayer() {
-  ctx.fillStyle = player.color;
-  ctx.beginPath();
-  ctx.moveTo(player.x + player.width / 2, player.y);
-  ctx.lineTo(player.x, player.y + player.height);
-  ctx.lineTo(player.x + player.width, player.y + player.height);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawBullet(b) {
-  ctx.save();
-  ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
-  ctx.shadowBlur = enableGlow ? 15 : 0;
-  ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
-  ctx.fillStyle = b.color || "yellow";
-  ctx.fillRect(b.x, b.y, 4, 10);
-  ctx.restore();
-}
-
-function drawEnemy(e) {
-  ctx.font = "24px Arial";
-  ctx.fillText("🍺", e.x, e.y);
-}
-
-function spawnEnemy() {
-  const speedMultiplier = 1 + (Math.floor(score / 100) * 0.3);
-  enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: speedMultiplier * enemyFallSpeed });
-}
-
-function shoot() {
-  const bulletCount = 1 + Math.floor(score / 100);
-  for (let i = 0; i < bulletCount; i++) {
-    const offset = (i - (bulletCount - 1) / 2) * 10;
-    const color = rainbowColors[i % rainbowColors.length];
-    bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
-    allColorsFired.add(color);
-  }
-  if (!enableGlow && allColorsFired.size >= 6) {
-    enableGlow = true;
-    rainbowSound.play();
-  }
-}
-
-function endGame() {
-  gameOver = true;
-  document.getElementById("gameOverMessage").innerHTML =
-    `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-  document.getElementById("gameOverScreen").style.display = "block";
-}
-
-function update() {
-  if (gameOver || isPaused) return;
-
-  if (Math.random() < enemySpawnRate) spawnEnemy();
-
-  if (shootTimer <= 0) {
-    shoot();
-    shootTimer = 10;
-  } else {
-    shootTimer--;
-  }
-
-  bullets.forEach((b, i) => {
-    b.y -= 5;
-    if (b.y < 0) bullets.splice(i, 1);
-  });
-
-  enemies.forEach((e, i) => {
-    e.y += e.speed;
-    if (e.y > canvas.height) {
-      enemies.splice(i, 1);
-      lives--;
-      document.getElementById("lives").textContent = "Lives: " + lives;
-      if (lives <= 0) {
-        if (score > highScore) {
-          highScore = score;
-          localStorage.setItem("highScore", highScore);
-        }
-        endGame();
+  <canvas id="gameCanvas"></canvas>
+  <div id="score">0</div>
+  <div id="lives">Lives: 10</div>
+  <button id="settingsBtn">⚙️</button>
+  <div id="settingsPanel">
+    <div class="settingLabel">Enemy Fall Speed: <span id="speedValue">1.0</span></div>
+    <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="1.0">
+  
+    <div class="settingLabel">Enemy Spawn Rate: <span id="spawnValue">0.02</span></div>
+    <input type="range" id="spawnSlider" min="0.01" max="0.1" step="0.01" value="0.02">
+  
+    <label class="toggleLabel">Drag to Move
+      <input type="checkbox" id="dragToggle">
+    </label>
+    <button id="resetBtn">Reset to Defaults</button>
+    <div id="saveMsg">Settings Saved!</div>
+    <button id="resumeBtn">Resume</button>
+  </div>
+  <div id="gameOverScreen">
+    <div id="gameOverMessage"></div>
+    <button id="restartBtn" onclick="location.reload()">Restart</button>
+  </div>
+  <div id="touchControls">
+    <div id="leftZone"></div>
+    <div id="rightZone"></div>
+  </div>
+  <audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
+  
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  
+    let score = 0;
+    let lives = 10;
+    let highScore = localStorage.getItem("highScore") || 0;
+    let gameOver = false;
+    let enemyFallSpeed = 1.0;
+    let enemySpawnRate = 0.02;
+    let useDragControl = false;
+    let isPaused = false;
+  
+    const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
+    const bullets = [];
+    const enemies = [];
+    let shootTimer = 0;
+    let enableGlow = false;
+    let allColorsFired = new Set();
+    const rainbowSound = document.getElementById("rainbowSound");
+  
+    let holdingLeft = false;
+    let holdingRight = false;
+  
+    const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
+  
+    const castleSources = [
+      "castle_red.png",
+      "castle_orange.png",
+      "castle_yellow.png",
+      "castle_green.png",
+      "castle_blue.png",
+      "castle_indigo.png",
+      "castle_violet.png",
+      "castle_rainbow.png"
+    ];
+  
+    const castleImages = [];
+    let allImagesLoaded = false;
+    let loadedCount = 0;
+  
+    castleSources.forEach((src, i) => {
+      const img = new Image();
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === castleSources.length) allImagesLoaded = true;
+      };
+      img.onerror = () => console.error("Image failed to load:", src);
+      img.src = src;
+      castleImages[i] = img;
+    });
+  
+    function getCurrentCastleIndex() {
+      return Math.min(Math.floor(score / 100), castleImages.length - 1);
+    }
+  
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.moveTo(player.x + player.width / 2, player.y);
+      ctx.lineTo(player.x, player.y + player.height);
+      ctx.lineTo(player.x + player.width, player.y + player.height);
+      ctx.closePath();
+      ctx.fill();
+    }
+  
+    function drawBullet(b) {
+      ctx.save();
+      ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
+      ctx.shadowBlur = enableGlow ? 15 : 0;
+      ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
+      ctx.fillStyle = b.color || "yellow";
+      ctx.fillRect(b.x, b.y, 4, 10);
+      ctx.restore();
+    }
+  
+    function drawEnemy(e) {
+      ctx.font = "24px Arial";
+      ctx.fillText("🍺", e.x, e.y);
+    }
+  
+    function spawnEnemy() {
+      const speedMultiplier = 1 + (Math.floor(score / 100) * 0.3);
+      enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: speedMultiplier * enemyFallSpeed });
+    }
+  
+    function shoot() {
+      const bulletCount = 1 + Math.floor(score / 100);
+      for (let i = 0; i < bulletCount; i++) {
+        const offset = (i - (bulletCount - 1) / 2) * 10;
+        const color = rainbowColors[i % rainbowColors.length];
+        bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
+        allColorsFired.add(color);
+      }
+      if (!enableGlow && allColorsFired.size >= 6) {
+        enableGlow = true;
+        rainbowSound.play();
       }
     }
-  });
-
-  bullets.forEach((b, bi) => {
-    enemies.forEach((e, ei) => {
-      if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
-        bullets.splice(bi, 1);
-        enemies.splice(ei, 1);
-        score++;
-        document.getElementById("score").textContent = score;
+  
+    function endGame() {
+      gameOver = true;
+      document.getElementById("gameOverMessage").innerHTML =
+        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+      document.getElementById("gameOverScreen").style.display = "block";
+    }
+  
+    function update() {
+      if (gameOver || isPaused) return;
+  
+      if (Math.random() < enemySpawnRate) spawnEnemy();
+  
+      if (shootTimer <= 0) {
+        shoot();
+        shootTimer = 10;
+      } else {
+        shootTimer--;
+      }
+  
+      // Update bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.y -= 5;
+        if (b.y < 0) {
+          bullets.splice(i, 1);
+        }
+      }
+  
+      // Update enemies
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        e.y += e.speed;
+        if (e.y > canvas.height) {
+          enemies.splice(i, 1);
+          lives--;
+          document.getElementById("lives").textContent = "Lives: " + lives;
+          if (lives <= 0) {
+            if (score > highScore) {
+              highScore = score;
+              localStorage.setItem("highScore", highScore);
+            }
+            endGame();
+          }
+        }
+      }
+  
+      // Check for collisions
+      for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        const b = bullets[bi];
+        for (let ei = enemies.length - 1; ei >= 0; ei--) {
+          const e = enemies[ei];
+          if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
+            bullets.splice(bi, 1);
+            enemies.splice(ei, 1);
+            score++;
+            document.getElementById("score").textContent = score;
+            break;
+          }
+        }
+      }
+  
+      // Player movement control
+      if (!useDragControl) {
+        if (holdingLeft) player.x -= 5;
+        if (holdingRight) player.x += 5;
+        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      }
+    }
+  
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (allImagesLoaded) {
+        const bg = castleImages[getCurrentCastleIndex()];
+        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+      }
+  
+      if (enableGlow) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+  
+      drawPlayer();
+      bullets.forEach(drawBullet);
+      enemies.forEach(drawEnemy);
+    }
+  
+    function gameLoop() {
+      update();
+      draw();
+      if (!gameOver) requestAnimationFrame(gameLoop);
+    }
+  
+    // Load saved settings from localStorage
+    const savedSpeed = localStorage.getItem("enemyFallSpeed");
+    if (savedSpeed !== null) {
+      enemyFallSpeed = parseFloat(savedSpeed);
+      document.getElementById("speedSlider").value = enemyFallSpeed;
+      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
+    }
+  
+    const savedSpawn = localStorage.getItem("enemySpawnRate");
+    if (savedSpawn !== null) {
+      enemySpawnRate = parseFloat(savedSpawn);
+      document.getElementById("spawnSlider").value = enemySpawnRate;
+      document.getElementById("spawnValue").textContent = enemySpawnRate;
+    }
+  
+    const savedDrag = localStorage.getItem("useDragControl");
+    if (savedDrag !== null) {
+      useDragControl = savedDrag === "true";
+      document.getElementById("dragToggle").checked = useDragControl;
+    }
+  
+    gameLoop();
+  
+    // Event listeners for settings panel
+    document.getElementById("settingsBtn").addEventListener("click", () => {
+      const panel = document.getElementById("settingsPanel");
+      isPaused = panel.style.display !== "block";
+      panel.style.display = isPaused ? "block" : "none";
+    });
+  
+    document.getElementById("speedSlider").addEventListener("input", e => {
+      enemyFallSpeed = parseFloat(e.target.value);
+      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
+      localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
+    });
+  
+    document.getElementById("spawnSlider").addEventListener("input", e => {
+      enemySpawnRate = parseFloat(e.target.value);
+      document.getElementById("spawnValue").textContent = enemySpawnRate;
+      localStorage.setItem("enemySpawnRate", enemySpawnRate);
+    });
+  
+    document.getElementById("dragToggle").addEventListener("change", e => {
+      useDragControl = e.target.checked;
+      localStorage.setItem("useDragControl", useDragControl);
+    });
+  
+    // Resume button in settings panel
+    document.getElementById("resumeBtn").addEventListener("click", () => {
+      isPaused = false;
+      document.getElementById("settingsPanel").style.display = "none";
+      showSaveMessage();
+    });
+  
+    // Reset to defaults button in settings panel
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      enemyFallSpeed = 1.0;
+      enemySpawnRate = 0.02;
+      useDragControl = false;
+  
+      document.getElementById("speedSlider").value = enemyFallSpeed;
+      document.getElementById("spawnSlider").value = enemySpawnRate;
+      document.getElementById("dragToggle").checked = useDragControl;
+  
+      document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
+      document.getElementById("spawnValue").textContent = enemySpawnRate;
+  
+      localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
+      localStorage.setItem("enemySpawnRate", enemySpawnRate);
+      localStorage.setItem("useDragControl", useDragControl);
+  
+      showSaveMessage();
+    });
+  
+    function showSaveMessage() {
+      const msg = document.getElementById("saveMsg");
+      msg.style.display = "block";
+      setTimeout(() => msg.style.display = "none", 2000);
+    }
+  
+    // Event listeners for player control
+  
+    // Mouse move for drag control
+    canvas.addEventListener("mousemove", e => {
+      if (useDragControl) {
+        player.x = e.clientX - player.width / 2;
+        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
       }
     });
-  });
-
-  if (!useDragControl) {
-    if (holdingLeft) player.x -= 5;
-    if (holdingRight) player.x += 5;
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (allImagesLoaded) {
-    const bg = castleImages[getCurrentCastleIndex()];
-    ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-  }
-
-  if (enableGlow) {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  drawPlayer();
-  bullets.forEach(drawBullet);
-  enemies.forEach(drawEnemy);
-}
-
-function gameLoop() {
-  update();
-  draw();
-  if (!gameOver) requestAnimationFrame(gameLoop);
-}
-
-// Load saved settings
-const savedSpeed = localStorage.getItem("enemyFallSpeed");
-if (savedSpeed !== null) {
-  enemyFallSpeed = parseFloat(savedSpeed);
-  document.getElementById("speedSlider").value = enemyFallSpeed;
-  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-}
-
-const savedSpawn = localStorage.getItem("enemySpawnRate");
-if (savedSpawn !== null) {
-  enemySpawnRate = parseFloat(savedSpawn);
-  document.getElementById("spawnSlider").value = enemySpawnRate;
-  document.getElementById("spawnValue").textContent = enemySpawnRate;
-}
-
-const savedDrag = localStorage.getItem("useDragControl");
-if (savedDrag !== null) {
-  useDragControl = savedDrag === "true";
-  document.getElementById("dragToggle").checked = useDragControl;
-}
-
-gameLoop();
-
-document.getElementById("settingsBtn").addEventListener("click", () => {
-  const panel = document.getElementById("settingsPanel");
-  isPaused = panel.style.display !== "block";
-  panel.style.display = isPaused ? "block" : "none";
-});
-
-document.getElementById("speedSlider").addEventListener("input", e => {
-  enemyFallSpeed = parseFloat(e.target.value);
-  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-  localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
-});
-
-document.getElementById("spawnSlider").addEventListener("input", e => {
-  enemySpawnRate = parseFloat(e.target.value);
-  document.getElementById("spawnValue").textContent = enemySpawnRate;
-  localStorage.setItem("enemySpawnRate", enemySpawnRate);
-});
-
-document.getElementById("dragToggle").addEventListener("change", e => {
-  useDragControl = e.target.checked;
-  localStorage.setItem("useDragControl", useDragControl);
-});
-
-document.getElementById("resumeBtn").addEventListener("click", () => {
-  isPaused = false;
-  document.getElementById("settingsPanel").style.display = "none";
-  showSaveMessage();
-});
-function showSaveMessage() {
-  const msg = document.getElementById("saveMsg");
-  msg.style.display = "block";
-  setTimeout(() => msg.style.display = "none", 2000);
-}
-
-document.getElementById("resetBtn").addEventListener("click", () => {
-  enemyFallSpeed = 1.0;
-  enemySpawnRate = 0.02;
-  useDragControl = false;
-
-  document.getElementById("speedSlider").value = enemyFallSpeed;
-  document.getElementById("spawnSlider").value = enemySpawnRate;
-  document.getElementById("dragToggle").checked = useDragControl;
-
-  document.getElementById("speedValue").textContent = enemyFallSpeed.toFixed(1);
-  document.getElementById("spawnValue").textContent = enemySpawnRate;
-
-  localStorage.setItem("enemyFallSpeed", enemyFallSpeed);
-  localStorage.setItem("enemySpawnRate", enemySpawnRate);
-  localStorage.setItem("useDragControl", useDragControl);
-
-  showSaveMessage();
-});
-
-
-
-
-canvas.addEventListener("mousemove", e => {
-  if (useDragControl) {
-    player.x = e.clientX - player.width / 2;
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-  }
-});
-
-canvas.addEventListener("touchmove", e => {
-  if (useDragControl && e.touches.length > 0) {
-    const touch = e.touches[0];
-    player.x = touch.clientX - player.width / 2;
-  }
-}, { passive: false });
-
-document.getElementById("leftZone").addEventListener("touchstart", () => {
-  if (!useDragControl) holdingLeft = true;
-});
-document.getElementById("leftZone").addEventListener("touchend", () => {
-  if (!useDragControl) holdingLeft = false;
-});
-document.getElementById("rightZone").addEventListener("touchstart", () => {
-  if (!useDragControl) holdingRight = true;
-});
-document.getElementById("rightZone").addEventListener("touchend", () => {
-  if (!useDragControl) holdingRight = false;
-});
-window.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft") holdingLeft = true;
-  if (e.key === "ArrowRight") holdingRight = true;
-});
-window.addEventListener("keyup", e => {
-  if (e.key === "ArrowLeft") holdingLeft = false;
-  if (e.key === "ArrowRight") holdingRight = false;
-});
-</script>
-
+  
+    // Touch move for drag control
+    canvas.addEventListener("touchmove", e => {
+      if (useDragControl && e.touches.length > 0) {
+        const touch = e.touches[0];
+        player.x = touch.clientX - player.width / 2;
+        player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      }
+    }, { passive: false });
+  
+    // Touch controls for left/right zones when not using drag control
+    document.getElementById("leftZone").addEventListener("touchstart", () => {
+      if (!useDragControl) holdingLeft = true;
+    });
+    document.getElementById("leftZone").addEventListener("touchend", () => {
+      if (!useDragControl) holdingLeft = false;
+    });
+    document.getElementById("rightZone").addEventListener("touchstart", () => {
+      if (!useDragControl) holdingRight = true;
+    });
+    document.getElementById("rightZone").addEventListener("touchend", () => {
+      if (!useDragControl) holdingRight = false;
+    });
+  
+    // Keyboard controls for left/right arrow keys (when not using drag control)
+    window.addEventListener("keydown", e => {
+      if (!useDragControl) {
+        if (e.key === "ArrowLeft") holdingLeft = true;
+        if (e.key === "ArrowRight") holdingRight = true;
+      }
+    });
+    window.addEventListener("keyup", e => {
+      if (!useDragControl) {
+        if (e.key === "ArrowLeft") holdingLeft = false;
+        if (e.key === "ArrowRight") holdingRight = false;
+      }
+    });
+  </script>
 </body>
 </html>
