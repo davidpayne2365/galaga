@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Galaga Bar Blast Lite</title>
   <style>
     html, body {
@@ -20,25 +20,22 @@
       width: 100vw;
       height: 100vh;
     }
-    #score {
+    #score, #lives {
       position: fixed;
-      top: 10px;
       left: 0;
       right: 0;
       text-align: center;
-      font-size: 6vw;
-      color: red;
       z-index: 10;
     }
+    #score {
+      top: 10px;
+      font-size: 6vw;
+      color: red;
+    }
     #lives {
-      position: fixed;
       top: 60px;
-      left: 0;
-      right: 0;
-      text-align: center;
       font-size: 4vw;
       color: white;
-      z-index: 10;
     }
     #gameOverScreen {
       display: none;
@@ -64,6 +61,26 @@
       border-radius: 10px;
       cursor: pointer;
     }
+    #touchControls {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 5;
+    }
+    #leftZone, #rightZone {
+      position: absolute;
+      top: 0;
+      width: 50%;
+      height: 100%;
+    }
+    #leftZone {
+      left: 0;
+    }
+    #rightZone {
+      right: 0;
+    }
   </style>
 </head>
 <body>
@@ -74,6 +91,10 @@
 <div id="gameOverScreen">
   <div id="gameOverMessage"></div>
   <button id="restartBtn" onclick="location.reload()">Restart</button>
+</div>
+<div id="touchControls">
+  <div id="leftZone"></div>
+  <div id="rightZone"></div>
 </div>
 <audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
 
@@ -88,13 +109,16 @@ let lives = 10;
 let highScore = localStorage.getItem("highScore") || 0;
 let gameOver = false;
 
-const player = { x: canvas.width / 2 - 15, y: canvas.height - 60, width: 30, height: 30, color: "cyan" };
+const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
 const bullets = [];
 const enemies = [];
 let shootTimer = 0;
 let enableGlow = false;
 let allColorsFired = new Set();
 const rainbowSound = document.getElementById("rainbowSound");
+
+let holdingLeft = false;
+let holdingRight = false;
 
 const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
 
@@ -141,13 +165,8 @@ function drawPlayer() {
 function drawBullet(b) {
   ctx.save();
   ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
-  if (enableGlow) {
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = b.color || "yellow";
-  } else {
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = "transparent";
-  }
+  ctx.shadowBlur = enableGlow ? 15 : 0;
+  ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
   ctx.fillStyle = b.color || "yellow";
   ctx.fillRect(b.x, b.y, 4, 10);
   ctx.restore();
@@ -227,11 +246,14 @@ function update() {
       }
     });
   });
+
+  if (holdingLeft) player.x -= 5;
+  if (holdingRight) player.x += 5;
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   if (allImagesLoaded) {
     const bg = castleImages[getCurrentCastleIndex()];
     ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
@@ -255,9 +277,32 @@ function gameLoop() {
 
 gameLoop();
 
+// Restore keyboard control
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") holdingLeft = true;
+  if (e.key === "ArrowRight") holdingRight = true;
+});
+window.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") holdingLeft = false;
+  if (e.key === "ArrowRight") holdingRight = false;
+});
+
+// Restore mouse/touch move control
 canvas.addEventListener("mousemove", e => {
   player.x = e.clientX - player.width / 2;
 });
+
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    player.x = touch.clientX - player.width / 2;
+  }
+}, { passive: false });
+
+document.getElementById("leftZone").addEventListener("touchstart", () => holdingLeft = true);
+document.getElementById("leftZone").addEventListener("touchend", () => holdingLeft = false);
+document.getElementById("rightZone").addEventListener("touchstart", () => holdingRight = true);
+document.getElementById("rightZone").addEventListener("touchend", () => holdingRight = false);
 </script>
 
 </body>
