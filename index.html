@@ -159,6 +159,9 @@
     const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
     let targetX = player.x;
   
+    // Bullet speed has been increased now
+    const bulletSpeed = 10;
+  
     const bullets = [];
     const enemies = [];
     let shootTimer = 0;
@@ -261,10 +264,10 @@
         shootTimer--;
       }
   
-      // Update bullets
+      // Update bullets with increased bullet speed
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
-        b.y -= 5;
+        b.y -= bulletSpeed;
         if (b.y < 0) {
           bullets.splice(i, 1);
         }
@@ -303,7 +306,7 @@
         }
       }
   
-      // Easing movement: gradually move player.x towards targetX
+      // Easing movement: gradually move player's x toward targetX
       player.x += (targetX - player.x) * 0.1;
       // Keep player within bounds
       player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
@@ -342,7 +345,6 @@
     // Settings panel event listeners
     document.getElementById("settingsBtn").addEventListener("click", () => {
       const panel = document.getElementById("settingsPanel");
-      // Toggle pause state when settings panel is visible
       panel.style.display = panel.style.display === "block" ? "none" : "block";
     });
   
@@ -375,7 +377,7 @@
       setTimeout(() => msg.style.display = "none", 2000);
     }
   
-    // Player control event listeners -- easing follow mode
+    // Player control event listeners (using easing follow mode)
     canvas.addEventListener("mousemove", e => {
       targetX = e.clientX - player.width / 2;
     });
