@@ -115,6 +115,7 @@
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
+let gamePaused = false;
     let nextWaveReady = false;
     let bulletSpeed = 0.5;
     let bulletCount = 1;
@@ -181,7 +182,7 @@
     }
 
     function update() {
-      if (gameOver) return;
+      if (gameOver || gamePaused) return;
 
       if (shootTimer <= 0) {
         shoot();
@@ -234,8 +235,17 @@
 
       if (enemies.length === 0 && !nextWaveReady) {
         nextWaveReady = true;
+        waveCount++;
+        fallingRows++; // Ensure this is updated on every wave
         setTimeout(() => {
-          showUpgradeOptions();
+          if (waveCount % 4 === 0) {
+            showUpgradeOptions();
+          } else {
+            if (fallSpeed < 3.0 && waveCount % 4 === 0) {
+              fallSpeed += 0.2;
+            }
+            dropEnemyRows();
+          }
         }, 1000);
       }
     }
@@ -254,6 +264,7 @@
     }
 
     function showUpgradeOptions() {
+      gamePaused = true;
       document.getElementById("upgradePanel").style.display = "flex";
     }
 
@@ -262,9 +273,10 @@
       else if (type === 'multi') bulletCount++;
       else if (type === 'pierce') piercingLevel++;
       document.getElementById("upgradePanel").style.display = "none";
+      gamePaused = false;
       fallingRows++;
       waveCount++;
-      if (waveCount % 3 === 0 && fallSpeed < 3.0) {
+      if (waveCount % 4 === 0 && fallSpeed < 3.0) {
         fallSpeed += 0.2;
       }
       dropEnemyRows();
