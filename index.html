@@ -92,7 +92,7 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <div id="score">0</div>
+  <div id="score">Wave: 1</div>
   <div id="lives">Lives: 10</div>
   <div id="gameOverScreen">
     <div id="gameOverMessage"></div>
@@ -221,7 +221,7 @@ let gamePaused = false;
           if (b.x < e.x + 24 && b.x + 2 > e.x && b.y < e.y + 24 && b.y + 16 > e.y) {
             enemies.splice(ei, 1);
             score++;
-            document.getElementById("score").textContent = score;
+            document.getElementById("score").textContent = "Wave: " + waveCount;
             if (b.pierce > 0) {
               b.pierce--;
               break;
@@ -235,7 +235,8 @@ let gamePaused = false;
 
       if (enemies.length === 0 && !nextWaveReady) {
         nextWaveReady = true;
-        waveCount++;
+        // Already updated in update function
+        document.getElementById("score").textContent = "Wave: " + waveCount;
         fallingRows++; // Ensure this is updated on every wave
         setTimeout(() => {
           if (waveCount % 4 === 0) {
