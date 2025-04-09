@@ -3,39 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Galaga Bar Blast Lite</title>
+  <title>Galaga Bar Blast Lite - Emoji Edition</title>
   <style>
+    /* Reset and base styling */
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
       width: 100%;
-      background: black;
+      background: linear-gradient(135deg, #000000, #434343);
       overflow: hidden;
-      font-family: sans-serif;
-      touch-action: none;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
     }
     canvas {
       display: block;
       width: 100vw;
       height: 100vh;
     }
-    #score, #lives {
-      position: fixed;
-      left: 0;
-      right: 0;
-      text-align: center;
-      z-index: 10;
-    }
+    /* UI Overlays */
     #score {
+      position: fixed;
       top: 10px;
-      font-size: 6vw;
-      color: red;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2rem;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
     }
     #lives {
+      position: fixed;
       top: 60px;
-      font-size: 4vw;
-      color: white;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.8rem;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.3rem 0.8rem;
+      border-radius: 8px;
     }
     #gameOverScreen {
       display: none;
@@ -45,64 +52,85 @@
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.85);
-      color: white;
-      font-size: 5vw;
-      text-align: center;
-      padding-top: 30vh;
       z-index: 20;
-    }
-    #restartBtn {
-      margin-top: 2vh;
-      padding: 1vh 2vw;
-      font-size: 4vw;
-      background-color: #222;
-      color: white;
-      border: 2px solid white;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    #upgradePanel {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      font-size: 5vw;
-      z-index: 25;
-      display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
+      padding: 0 2rem;
     }
-    .upgradeBtn {
-      margin: 2vw;
-      padding: 3vw 5vw;
-      font-size: 5vw;
-      background-color: white;
-      color: black;
-      border: 2px solid white;
-      border-radius: 12px;
+    #gameOverScreen .message {
+      font-size: 3rem;
+      margin-bottom: 2rem;
+    }
+    #restartBtn {
+      padding: 1rem 2rem;
+      font-size: 1.8rem;
+      background-color: #222;
+      color: #fff;
+      border: 2px solid #fff;
+      border-radius: 10px;
       cursor: pointer;
+      transition: background 0.3s;
+    }
+    #restartBtn:hover {
+      background-color: #444;
+    }
+    /* Bullet Selection Panel */
+    #bulletSelection {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 1.5rem;
+    }
+    #bulletSelection div {
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+    .bulletBtn {
+      background: #fff;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      width: 3rem;
+      height: 3rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 1.6rem;
+    }
+    .bulletBtn.selected, .bulletBtn:hover {
+      background: #ffcc00;
+      border-color: #ffcc00;
+      color: #000;
     }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <div id="score">Wave: 1</div>
+  <div id="score">Score: 0 | Wave: 1</div>
   <div id="lives">Lives: 10</div>
+
   <div id="gameOverScreen">
-    <div id="gameOverMessage"></div>
+    <div class="message" id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
   </div>
-  <div id="upgradePanel">
-    <div>Choose Your Upgrade:</div>
-    <button class="upgradeBtn" onclick="applyUpgrade('faster')">Faster Bullets</button>
-    <button class="upgradeBtn" onclick="applyUpgrade('multi')">+1 Bullet</button>
-    <button class="upgradeBtn" onclick="applyUpgrade('pierce')">Piercing Upgrade</button>
+
+  <div id="bulletSelection">
+    <div>Select Your Bullet:</div>
+    <button class="bulletBtn" data-type="regular">🍸</button>
+    <button class="bulletBtn" data-type="slow">🍷</button>
+    <button class="bulletBtn" data-type="explosive">🍹</button>
+    <button class="bulletBtn" data-type="piercing">☕</button>
   </div>
 
   <script>
@@ -115,19 +143,37 @@
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
-let gamePaused = false;
-    let nextWaveReady = false;
-    let bulletSpeed = 0.5;
-    let bulletCount = 1;
-    let piercingLevel = 0;
-    let waveCount = 0;
-    let fallSpeed = 0.5;
 
-    const player = { x: canvas.width / 2 - 15, y: canvas.height / 2 - 15, width: 30, height: 30, color: "cyan" };
+    let waveCount = 1;
+    let fallSpeed = 0.5;
+    let shootTimer = 0;
+    let globalSlowTimer = 0;
+
+    const player = {
+      x: canvas.width / 2 - 15,
+      y: canvas.height - 80,
+      width: 30,
+      height: 30,
+      color: "cyan"
+    };
+
     const bullets = [];
     const enemies = [];
     let fallingRows = 1;
-    let shootTimer = 0;
+
+    const bulletEmojis = {
+      regular: "🍸",
+      slow: "🍷",
+      explosive: "🍹",
+      piercing: "☕"
+    };
+
+    let currentBulletType = "regular";
+
+    function updateUI() {
+      document.getElementById("score").textContent = "Score: " + score + " | Wave: " + waveCount;
+      document.getElementById("lives").textContent = "Lives: " + lives;
+    }
 
     function drawPlayer() {
       ctx.fillStyle = player.color;
@@ -140,49 +186,54 @@ let gamePaused = false;
     }
 
     function drawBullet(b) {
-      ctx.fillStyle = "white";
-      ctx.fillRect(b.x, b.y, 2, 16);
+      ctx.font = "24px sans-serif";
+      ctx.fillText(b.emoji, b.x, b.y);
     }
 
     function drawEnemy(e) {
       ctx.font = "24px Arial";
-      ctx.fillText("🍺", e.x, e.y);
+      ctx.fillText(e.emoji, e.x, e.y);
     }
 
     function dropEnemyRows() {
       const enemyWidth = 24;
       const spacing = 5;
-      const totalWidth = (enemyWidth + spacing) * Math.floor(canvas.width / (enemyWidth + spacing));
+      const enemiesPerRow = Math.floor(canvas.width / (enemyWidth + spacing));
+      const totalWidth = enemiesPerRow * (enemyWidth + spacing);
       let xStart = (canvas.width - totalWidth) / 2;
       for (let row = 0; row < fallingRows; row++) {
         let x = xStart;
         while (x + enemyWidth < canvas.width) {
-          enemies.push({ x, y: -row * 30, speed: fallSpeed });
+          const enemyEmojis = ["🍺", "🍷", "🍸", "🍹"];
+          const randomEmoji = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
+          enemies.push({ x: x, y: -row * 30, speed: fallSpeed, emoji: randomEmoji });
           x += enemyWidth + spacing;
         }
       }
-      nextWaveReady = false;
     }
 
     function shoot() {
-      const spacing = 20;
-      const totalWidth = (bulletCount - 1) * spacing;
-      const startX = player.x + player.width / 2 - 2 - totalWidth / 2;
-      for (let i = 0; i < bulletCount; i++) {
-        const x = startX + i * spacing;
-        bullets.push({ x: x, y: player.y, pierce: piercingLevel });
+      const bullet = {
+        x: player.x + player.width / 2,
+        y: player.y,
+        type: currentBulletType,
+        emoji: bulletEmojis[currentBulletType]
+      };
+      if (currentBulletType === "piercing") {
+        bullet.pierce = 2;
       }
+      bullets.push(bullet);
     }
 
     function endGame() {
       gameOver = true;
       document.getElementById("gameOverMessage").innerHTML =
         `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-      document.getElementById("gameOverScreen").style.display = "block";
+      document.getElementById("gameOverScreen").style.display = "flex";
     }
 
     function update() {
-      if (gameOver || gamePaused) return;
+      if (gameOver) return;
 
       if (shootTimer <= 0) {
         shoot();
@@ -192,18 +243,20 @@ let gamePaused = false;
       }
 
       for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
-        b.y -= bulletSpeed;
+        let b = bullets[i];
+        b.y -= 5;
         if (b.y < 0) bullets.splice(i, 1);
       }
 
+      if (globalSlowTimer > 0) globalSlowTimer--;
+
       for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-        e.y += e.speed;
+        let e = enemies[i];
+        let speedFactor = (globalSlowTimer > 0) ? 0.5 : 1;
+        e.y += e.speed * speedFactor;
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
           lives--;
-          document.getElementById("lives").textContent = "Lives: " + lives;
           if (lives <= 0) {
             if (score > highScore) {
               highScore = score;
@@ -211,43 +264,65 @@ let gamePaused = false;
             }
             endGame();
           }
+          updateUI();
         }
       }
 
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
-        const b = bullets[bi];
+        let b = bullets[bi];
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
-          const e = enemies[ei];
-          if (b.x < e.x + 24 && b.x + 2 > e.x && b.y < e.y + 24 && b.y + 16 > e.y) {
-            enemies.splice(ei, 1);
-            score++;
-            document.getElementById("score").textContent = "Wave: " + waveCount;
-            if (b.pierce > 0) {
-              b.pierce--;
-              break;
-            } else {
-              bullets.splice(bi, 1);
-              break;
+          let e = enemies[ei];
+          if (b.x < e.x + 24 && b.x + 24 > e.x && b.y < e.y + 24 && b.y + 24 > e.y) {
+            switch (b.type) {
+              case "regular":
+                enemies.splice(ei, 1);
+                bullets.splice(bi, 1);
+                score++;
+                break;
+              case "slow":
+                enemies.splice(ei, 1);
+                globalSlowTimer = 120;
+                bullets.splice(bi, 1);
+                score++;
+                break;
+              case "explosive":
+                enemies.splice(ei, 1);
+                const explosionRadius = 50;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                  const other = enemies[j];
+                  const dx = other.x - b.x;
+                  const dy = other.y - b.y;
+                  if (Math.sqrt(dx * dx + dy * dy) < explosionRadius) {
+                    enemies.splice(j, 1);
+                    score++;
+                  }
+                }
+                bullets.splice(bi, 1);
+                break;
+              case "piercing":
+                enemies.splice(ei, 1);
+                score++;
+                b.pierce--;
+                if (b.pierce <= 0) bullets.splice(bi, 1);
+                break;
             }
+            updateUI();
+            break;
           }
         }
       }
 
       if (enemies.length === 0 && !nextWaveReady) {
         nextWaveReady = true;
-        // Already updated in update function
-        document.getElementById("score").textContent = "Wave: " + waveCount;
-        fallingRows++; // Ensure this is updated on every wave
         setTimeout(() => {
-          if (waveCount % 4 === 0) {
-            showUpgradeOptions();
-          } else {
-            if (fallSpeed < 3.0 && waveCount % 4 === 0) {
-              fallSpeed += 0.2;
-            }
-            dropEnemyRows();
-          }
+          waveCount++;
+          fallingRows++;
+          if (waveCount % 5 === 0 && fallSpeed < 3.0) fallSpeed += 0.2;
+          updateUI();
+          nextWaveReady = false;
+          dropEnemyRows();
         }, 1000);
+        return;
       }
     }
 
@@ -264,29 +339,11 @@ let gamePaused = false;
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
-    function showUpgradeOptions() {
-      gamePaused = true;
-      document.getElementById("upgradePanel").style.display = "flex";
-    }
-
-    function applyUpgrade(type) {
-      if (type === 'faster') bulletSpeed += 2;
-      else if (type === 'multi') bulletCount++;
-      else if (type === 'pierce') piercingLevel++;
-      document.getElementById("upgradePanel").style.display = "none";
-      gamePaused = false;
-      fallingRows++;
-      waveCount++;
-      if (waveCount % 4 === 0 && fallSpeed < 3.0) {
-        fallSpeed += 0.2;
-      }
-      dropEnemyRows();
-    }
-
-    dropEnemyRows();
-    gameLoop();
-
-    canvas.addEventListener("touchmove", e => {
+    canvas.addEventListener("mousemove", (e) => {
+      player.x = e.clientX - player.width / 2;
+      player.y = e.clientY - player.height / 2;
+    });
+    canvas.addEventListener("touchmove", (e) => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
@@ -295,10 +352,19 @@ let gamePaused = false;
       }
     }, { passive: false });
 
-    canvas.addEventListener("mousemove", e => {
-      player.x = e.clientX - player.width / 2;
-      player.y = e.clientY - player.height / 2;
+    const bulletButtons = document.querySelectorAll(".bulletBtn");
+    bulletButtons.forEach(button => {
+      button.addEventListener("click", function() {
+        currentBulletType = this.getAttribute("data-type");
+        bulletButtons.forEach(btn => btn.classList.remove("selected"));
+        this.classList.add("selected");
+      });
     });
+    document.querySelector(".bulletBtn[data-type='regular']").classList.add("selected");
+
+    let nextWaveReady = false;
+    dropEnemyRows();
+    gameLoop();
   </script>
 </body>
 </html>
