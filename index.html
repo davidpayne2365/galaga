@@ -283,7 +283,7 @@
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
-        player.y = touch.clientY - player.height / 2 + player.height; // adjust to stay under finger
+        player.y = touch.clientY - player.height * 1.5; // position slightly above finger
         e.preventDefault();
       }
     }, { passive: false });
