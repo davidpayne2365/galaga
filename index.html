@@ -37,54 +37,6 @@
       font-size: 4vw;
       color: white;
     }
-    #settingsBtn {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 15;
-      font-size: 6vw;
-      color: white;
-      background: none;
-      border: none;
-      cursor: pointer;
-    }
-    #settingsPanel {
-      display: none;
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 80vw;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      padding: 4vw;
-      z-index: 30;
-    }
-    .settingLabel {
-      margin-top: 4vw;
-      font-size: 4vw;
-    }
-    select {
-      width: 100%;
-      font-size: 4vw;
-      margin-top: 2vw;
-    }
-    #resetBtn, #resumeBtn {
-      margin-top: 5vw; 
-      padding: 2vw 4vw; 
-      font-size: 4vw; 
-      background-color: #222; 
-      color: white; 
-      border: 1px solid white; 
-      border-radius: 8px; 
-      cursor: pointer;
-    }
-    #saveMsg {
-      margin-top: 3vw;
-      font-size: 3.5vw;
-      color: lightgreen;
-      display: none;
-    }
     #gameOverScreen {
       display: none;
       position: fixed;
@@ -115,23 +67,10 @@
   <canvas id="gameCanvas"></canvas>
   <div id="score">0</div>
   <div id="lives">Lives: 10</div>
-  <button id="settingsBtn">⚙️</button>
-  <div id="settingsPanel">
-    <div class="settingLabel">Difficulty:</div>
-    <select id="difficultySelect">
-      <option value="easy">Easy</option>
-      <option value="medium">Medium</option>
-      <option value="hard">Hard</option>
-    </select>
-    <button id="resetBtn">Reset to Defaults</button>
-    <div id="saveMsg">Settings Saved!</div>
-    <button id="resumeBtn">Resume</button>
-  </div>
   <div id="gameOverScreen">
     <div id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
   </div>
-  <audio id="rainbowSound" src="https://cdn.jsdelivr.net/gh/mattdesl/audio-examples/audio/zap1.mp3" preload="auto"></audio>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
@@ -143,60 +82,17 @@
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
-    let paused = false;
-
-    let enemyFallSpeed = 1.0;
-    let enemySpawnRate = 0.02;
-
-    const difficultySettings = {
-      easy: { enemyFallSpeed: 2.0, enemySpawnRate: 0.03 },
-      medium: { enemyFallSpeed: 3.0, enemySpawnRate: 0.04 },
-      hard: { enemyFallSpeed: 4.0, enemySpawnRate: 0.05 }
-    };
+    let nextWaveReady = false;
 
     const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
-    let targetX = player.x;
-
     const bulletSpeed = 10;
-
     const bullets = [];
     const enemies = [];
+    let fallingRows = 1;
     let shootTimer = 0;
     let enableGlow = false;
     let allColorsFired = new Set();
-    const rainbowSound = document.getElementById("rainbowSound");
-
     const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
-
-    const castleSources = [
-      "castle_red.png",
-      "castle_orange.png",
-      "castle_yellow.png",
-      "castle_green.png",
-      "castle_blue.png",
-      "castle_indigo.png",
-      "castle_violet.png",
-      "castle_rainbow.png"
-    ];
-
-    const castleImages = [];
-    let allImagesLoaded = false;
-    let loadedCount = 0;
-
-    castleSources.forEach((src, i) => {
-      const img = new Image();
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === castleSources.length) allImagesLoaded = true;
-      };
-      img.onerror = () => console.error("Image failed to load:", src);
-      img.src = src;
-      castleImages[i] = img;
-    });
-
-    function getCurrentCastleIndex() {
-      return Math.min(Math.floor(score / 100), castleImages.length - 1);
-    }
 
     function drawPlayer() {
       ctx.fillStyle = player.color;
@@ -208,23 +104,61 @@
       ctx.fill();
     }
 
-    function update() {
-      if (gameOver || paused) return;
+    function drawBullet(b) {
+      ctx.save();
+      ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
+      ctx.shadowBlur = enableGlow ? 15 : 0;
+      ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
+      ctx.fillStyle = b.color || "yellow";
+      ctx.fillRect(b.x, b.y, 4, 10);
+      ctx.restore();
+    }
 
-      if (Math.random() < enemySpawnRate) enemies.push({ x: Math.random() * (canvas.width - 24), y: -30, speed: enemyFallSpeed });
+    function drawEnemy(e) {
+      ctx.font = "24px Arial";
+      ctx.fillText("🍺", e.x, e.y);
+    }
+
+    function dropEnemyRows() {
+      const enemyWidth = 24;
+      const spacing = 5;
+      const totalWidth = (enemyWidth + spacing) * Math.floor(canvas.width / (enemyWidth + spacing));
+      let xStart = (canvas.width - totalWidth) / 2;
+      for (let row = 0; row < fallingRows; row++) {
+        let x = xStart;
+        while (x + enemyWidth < canvas.width) {
+          enemies.push({ x, y: -row * 30, speed: 0.5 });
+          x += enemyWidth + spacing;
+        }
+      }
+      nextWaveReady = false;
+    }
+
+    function shoot() {
+      const bulletCount = 1 + Math.floor(score / 100);
+      for (let i = 0; i < bulletCount; i++) {
+        const offset = (i - (bulletCount - 1) / 2) * 10;
+        const color = rainbowColors[i % rainbowColors.length];
+        bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
+        allColorsFired.add(color);
+      }
+      if (!enableGlow && allColorsFired.size >= 6) {
+        enableGlow = true;
+      }
+    }
+
+    function endGame() {
+      gameOver = true;
+      document.getElementById("gameOverMessage").innerHTML =
+        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+      document.getElementById("gameOverScreen").style.display = "block";
+    }
+
+    function update() {
+      if (gameOver) return;
 
       if (shootTimer <= 0) {
-        const bulletCount = 1 + Math.floor(score / 100);
-        for (let i = 0; i < bulletCount; i++) {
-          const offset = (i - (bulletCount - 1) / 2) * 10;
-          const color = rainbowColors[i % rainbowColors.length];
-          bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
-          allColorsFired.add(color);
-        }
-        if (!enableGlow && allColorsFired.size >= 6) {
-          enableGlow = true;
-          rainbowSound.play();
-        }
+        shoot();
         shootTimer = 10;
       } else {
         shootTimer--;
@@ -233,7 +167,9 @@
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.y -= bulletSpeed;
-        if (b.y < 0) bullets.splice(i, 1);
+        if (b.y < 0) {
+          bullets.splice(i, 1);
+        }
       }
 
       for (let i = enemies.length - 1; i >= 0; i--) {
@@ -248,17 +184,15 @@
               highScore = score;
               localStorage.setItem("highScore", highScore);
             }
-            gameOver = true;
-            document.getElementById("gameOverMessage").innerHTML = `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-            document.getElementById("gameOverScreen").style.display = "block";
+            endGame();
           }
         }
       }
 
-      for (let bi = bullets.length - 1; bi >= 0; bi--) {
-        const b = bullets[bi];
-        for (let ei = enemies.length - 1; ei >= 0; ei--) {
-          const e = enemies[ei];
+      for (let ei = enemies.length - 1; ei >= 0; ei--) {
+        const e = enemies[ei];
+        for (let bi = bullets.length - 1; bi >= 0; bi--) {
+          const b = bullets[bi];
           if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
             bullets.splice(bi, 1);
             enemies.splice(ei, 1);
@@ -269,31 +203,20 @@
         }
       }
 
-      player.x = targetX; // Instant follow, no lag
-      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      if (enemies.length === 0 && !nextWaveReady) {
+        nextWaveReady = true;
+        setTimeout(() => {
+          fallingRows++;
+          dropEnemyRows();
+        }, 1000);
+      }
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (allImagesLoaded) ctx.drawImage(castleImages[getCurrentCastleIndex()], 0, 0, canvas.width, canvas.height);
-      if (enableGlow) {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
       drawPlayer();
-      bullets.forEach(b => {
-        ctx.save();
-        ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
-        ctx.shadowBlur = enableGlow ? 15 : 0;
-        ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
-        ctx.fillStyle = b.color || "yellow";
-        ctx.fillRect(b.x, b.y, 4, 10);
-        ctx.restore();
-      });
-      enemies.forEach(e => {
-        ctx.font = "24px Arial";
-        ctx.fillText("🍺", e.x, e.y);
-      });
+      bullets.forEach(drawBullet);
+      enemies.forEach(drawEnemy);
     }
 
     function gameLoop() {
@@ -302,58 +225,22 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
-    document.getElementById("difficultySelect").value = localStorage.getItem("difficulty") || "easy";
-    ({ enemyFallSpeed, enemySpawnRate } = difficultySettings[document.getElementById("difficultySelect").value]);
-
-    document.getElementById("settingsBtn").addEventListener("click", () => {
-      const panel = document.getElementById("settingsPanel");
-      const isOpen = panel.style.display === "block";
-      panel.style.display = isOpen ? "none" : "block";
-      paused = !isOpen;
-    });
-
-    document.getElementById("difficultySelect").addEventListener("change", e => {
-      const selected = e.target.value;
-      const settings = difficultySettings[selected];
-      enemyFallSpeed = settings.enemyFallSpeed;
-      enemySpawnRate = settings.enemySpawnRate;
-      localStorage.setItem("difficulty", selected);
-      const msg = document.getElementById("saveMsg");
-      msg.style.display = "block";
-      setTimeout(() => msg.style.display = "none", 2000);
-    });
-
-    document.getElementById("resetBtn").addEventListener("click", () => {
-      document.getElementById("difficultySelect").value = "easy";
-      enemyFallSpeed = difficultySettings.easy.enemyFallSpeed;
-      enemySpawnRate = difficultySettings.easy.enemySpawnRate;
-      localStorage.setItem("difficulty", "easy");
-      const msg = document.getElementById("saveMsg");
-      msg.style.display = "block";
-      setTimeout(() => msg.style.display = "none", 2000);
-    });
-
-    document.getElementById("resumeBtn").addEventListener("click", () => {
-      document.getElementById("settingsPanel").style.display = "none";
-      paused = false;
-      const msg = document.getElementById("saveMsg");
-      msg.style.display = "block";
-      setTimeout(() => msg.style.display = "none", 2000);
-    });
-
-    canvas.addEventListener("mousemove", e => {
-      targetX = e.clientX - player.width / 2;
-    });
+    dropEnemyRows();
+    gameLoop();
 
     canvas.addEventListener("touchmove", e => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
-        targetX = touch.clientX - player.width / 2;
+        player.x = touch.clientX - player.width / 2;
+        player.y = touch.clientY - player.height / 2;
         e.preventDefault();
       }
     }, { passive: false });
 
-    gameLoop();
+    canvas.addEventListener("mousemove", e => {
+      player.x = e.clientX - player.width / 2;
+      player.y = e.clientY - player.height / 2;
+    });
   </script>
 </body>
 </html>
