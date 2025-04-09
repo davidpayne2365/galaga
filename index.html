@@ -61,6 +61,30 @@
       border-radius: 10px;
       cursor: pointer;
     }
+    #upgradePanel {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      font-size: 5vw;
+      z-index: 25;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    .upgradeBtn {
+      margin: 2vw;
+      padding: 2vw 4vw;
+      font-size: 4vw;
+      background-color: #333;
+      border: 2px solid white;
+      border-radius: 12px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -70,6 +94,12 @@
   <div id="gameOverScreen">
     <div id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
+  </div>
+  <div id="upgradePanel">
+    <div>Choose Your Upgrade:</div>
+    <button class="upgradeBtn" onclick="applyUpgrade('faster')">Faster Bullets</button>
+    <button class="upgradeBtn" onclick="applyUpgrade('multi')">+1 Bullet</button>
+    <button class="upgradeBtn" onclick="applyUpgrade('pierce')">Piercing Upgrade</button>
   </div>
 
   <script>
@@ -83,16 +113,18 @@
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
     let nextWaveReady = false;
+    let bulletSpeed = 0.5;
+    let bulletCount = 1;
+    let piercingLevel = 0;
+    let shootCooldown = 30;
+    let shootTimer = 0;
+    let waveCount = 1;
 
     const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
-    const bulletSpeed = 10;
     const bullets = [];
     const enemies = [];
     let fallingRows = 1;
-    let shootTimer = 0;
-    let enableGlow = false;
-    let allColorsFired = new Set();
-    const rainbowColors = ["#FF00FF", "#FF9900", "#FFFF00", "#39FF14", "#00FFFF", "#8A2BE2", "#FF00FF"];
+    let enemySpeed = 0.5;
 
     function drawPlayer() {
       ctx.fillStyle = player.color;
@@ -105,13 +137,8 @@
     }
 
     function drawBullet(b) {
-      ctx.save();
-      ctx.globalAlpha = enableGlow ? 0.9 : 1.0;
-      ctx.shadowBlur = enableGlow ? 15 : 0;
-      ctx.shadowColor = enableGlow ? b.color || "yellow" : "transparent";
-      ctx.fillStyle = b.color || "yellow";
+      ctx.fillStyle = "white";
       ctx.fillRect(b.x, b.y, 4, 10);
-      ctx.restore();
     }
 
     function drawEnemy(e) {
@@ -122,12 +149,13 @@
     function dropEnemyRows() {
       const enemyWidth = 24;
       const spacing = 5;
-      const totalWidth = (enemyWidth + spacing) * Math.floor(canvas.width / (enemyWidth + spacing));
+      const totalEnemies = Math.floor(canvas.width / (enemyWidth + spacing)) - 2;
+      const totalWidth = (enemyWidth + spacing) * totalEnemies;
       let xStart = (canvas.width - totalWidth) / 2;
       for (let row = 0; row < fallingRows; row++) {
         let x = xStart;
-        while (x + enemyWidth < canvas.width) {
-          enemies.push({ x, y: -row * 30, speed: 0.5 });
+        for (let i = 0; i < totalEnemies; i++) {
+          enemies.push({ x, y: -row * 30, speed: enemySpeed });
           x += enemyWidth + spacing;
         }
       }
@@ -135,15 +163,12 @@
     }
 
     function shoot() {
-      const bulletCount = 1 + Math.floor(score / 100);
+      const spacing = 20;
+      const totalWidth = (bulletCount - 1) * spacing;
+      const startX = player.x + player.width / 2 - 2 - totalWidth / 2;
       for (let i = 0; i < bulletCount; i++) {
-        const offset = (i - (bulletCount - 1) / 2) * 10;
-        const color = rainbowColors[i % rainbowColors.length];
-        bullets.push({ x: player.x + player.width / 2 - 2 + offset, y: player.y, color });
-        allColorsFired.add(color);
-      }
-      if (!enableGlow && allColorsFired.size >= 6) {
-        enableGlow = true;
+        const x = startX + i * spacing;
+        bullets.push({ x: x, y: player.y, pierce: piercingLevel });
       }
     }
 
@@ -159,7 +184,7 @@
 
       if (shootTimer <= 0) {
         shoot();
-        shootTimer = 10;
+        shootTimer = shootCooldown;
       } else {
         shootTimer--;
       }
@@ -167,9 +192,7 @@
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.y -= bulletSpeed;
-        if (b.y < 0) {
-          bullets.splice(i, 1);
-        }
+        if (b.y < 0) bullets.splice(i, 1);
       }
 
       for (let i = enemies.length - 1; i >= 0; i--) {
@@ -189,16 +212,21 @@
         }
       }
 
-      for (let ei = enemies.length - 1; ei >= 0; ei--) {
-        const e = enemies[ei];
-        for (let bi = bullets.length - 1; bi >= 0; bi--) {
-          const b = bullets[bi];
+      for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        const b = bullets[bi];
+        for (let ei = enemies.length - 1; ei >= 0; ei--) {
+          const e = enemies[ei];
           if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
-            bullets.splice(bi, 1);
             enemies.splice(ei, 1);
             score++;
             document.getElementById("score").textContent = score;
-            break;
+            if (b.pierce > 0) {
+              b.pierce--;
+              break;
+            } else {
+              bullets.splice(bi, 1);
+              break;
+            }
           }
         }
       }
@@ -206,8 +234,12 @@
       if (enemies.length === 0 && !nextWaveReady) {
         nextWaveReady = true;
         setTimeout(() => {
-          fallingRows++;
-          dropEnemyRows();
+          waveCount++;
+          if (waveCount % 2 === 0) {
+            document.getElementById("upgradePanel").style.display = "flex";
+          } else {
+            applyUpgrade(null);
+          }
         }, 1000);
       }
     }
@@ -223,6 +255,20 @@
       update();
       draw();
       if (!gameOver) requestAnimationFrame(gameLoop);
+    }
+
+    function showUpgradeOptions() {
+      document.getElementById("upgradePanel").style.display = "flex";
+    }
+
+    function applyUpgrade(type) {
+      if (type === 'faster') shootCooldown = Math.max(5, shootCooldown - 15);
+      else if (type === 'multi') bulletCount++;
+      else if (type === 'pierce') piercingLevel++;
+      document.getElementById("upgradePanel").style.display = "none";
+      fallingRows++;
+      enemySpeed *= 1.25;
+      dropEnemyRows();
     }
 
     dropEnemyRows();
