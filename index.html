@@ -108,7 +108,14 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    const scoreEl = document.getElementById("score");
+    const livesEl = document.getElementById("lives");
+    const upgradePanel = document.getElementById("upgradePanel");
+    const gameOverMessage = document.getElementById("gameOverMessage");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+
     let score = 0;
+    let lastScore = -1;
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
@@ -174,9 +181,8 @@
 
     function endGame() {
       gameOver = true;
-      document.getElementById("gameOverMessage").innerHTML =
-        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-      document.getElementById("gameOverScreen").style.display = "block";
+      gameOverMessage.innerHTML = `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+      gameOverScreen.style.display = "block";
     }
 
     function update() {
@@ -201,7 +207,7 @@
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
           lives--;
-          document.getElementById("lives").textContent = "Lives: " + lives;
+          livesEl.textContent = "Lives: " + lives;
           if (lives <= 0) {
             if (score > highScore) {
               highScore = score;
@@ -219,7 +225,10 @@
           if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
             enemies.splice(ei, 1);
             score++;
-            document.getElementById("score").textContent = score;
+            if (score !== lastScore) {
+              lastScore = score;
+              scoreEl.textContent = score;
+            }
             if (b.pierce > 0) {
               b.pierce--;
               break;
@@ -236,7 +245,7 @@
         setTimeout(() => {
           waveCount++;
           if (waveCount % 2 === 0) {
-            document.getElementById("upgradePanel").style.display = "flex";
+            upgradePanel.style.display = "flex";
           } else {
             applyUpgrade(null);
           }
@@ -247,8 +256,8 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawPlayer();
-      bullets.forEach(drawBullet);
-      enemies.forEach(drawEnemy);
+      for (const bullet of bullets) drawBullet(bullet);
+      for (const enemy of enemies) drawEnemy(enemy);
     }
 
     function gameLoop() {
@@ -257,15 +266,11 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
-    function showUpgradeOptions() {
-      document.getElementById("upgradePanel").style.display = "flex";
-    }
-
     function applyUpgrade(type) {
-      if (type === 'faster') shootCooldown = Math.max(5, shootCooldown - 15);
+      if (type === 'faster') shootCooldown = Math.max(10, shootCooldown - 15);
       else if (type === 'multi') bulletCount++;
       else if (type === 'pierce') piercingLevel++;
-      document.getElementById("upgradePanel").style.display = "none";
+      upgradePanel.style.display = "none";
       fallingRows++;
       enemySpeed *= 1.25;
       dropEnemyRows();
@@ -278,7 +283,7 @@
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
-        player.y = touch.clientY - player.height / 2;
+        player.y = touch.clientY - player.height / 2 + player.height; // adjust to stay under finger
         e.preventDefault();
       }
     }, { passive: false });
