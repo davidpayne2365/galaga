@@ -72,15 +72,18 @@
       color: white;
       font-size: 5vw;
       z-index: 25;
+      display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
     }
     .upgradeBtn {
       margin: 2vw;
-      padding: 2vw 4vw;
-      font-size: 4vw;
-      background-color: #333;
+      padding: 3vw 5vw;
+      font-size: 5vw;
+      background-color: white;
+      color: black;
       border: 2px solid white;
       border-radius: 12px;
       cursor: pointer;
@@ -108,14 +111,7 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const scoreEl = document.getElementById("score");
-    const livesEl = document.getElementById("lives");
-    const upgradePanel = document.getElementById("upgradePanel");
-    const gameOverMessage = document.getElementById("gameOverMessage");
-    const gameOverScreen = document.getElementById("gameOverScreen");
-
     let score = 0;
-    let lastScore = -1;
     let lives = 10;
     let highScore = localStorage.getItem("highScore") || 0;
     let gameOver = false;
@@ -123,15 +119,14 @@
     let bulletSpeed = 0.5;
     let bulletCount = 1;
     let piercingLevel = 0;
-    let shootCooldown = 30;
-    let shootTimer = 0;
-    let waveCount = 1;
+    let waveCount = 0;
+    let fallSpeed = 0.5;
 
-    const player = { x: canvas.width / 2 - 15, y: canvas.height - 90, width: 30, height: 30, color: "cyan" };
+    const player = { x: canvas.width / 2 - 15, y: canvas.height / 2 - 15, width: 30, height: 30, color: "cyan" };
     const bullets = [];
     const enemies = [];
     let fallingRows = 1;
-    let enemySpeed = 0.5;
+    let shootTimer = 0;
 
     function drawPlayer() {
       ctx.fillStyle = player.color;
@@ -145,7 +140,7 @@
 
     function drawBullet(b) {
       ctx.fillStyle = "white";
-      ctx.fillRect(b.x, b.y, 4, 10);
+      ctx.fillRect(b.x, b.y, 2, 16);
     }
 
     function drawEnemy(e) {
@@ -156,13 +151,12 @@
     function dropEnemyRows() {
       const enemyWidth = 24;
       const spacing = 5;
-      const totalEnemies = Math.floor(canvas.width / (enemyWidth + spacing)) - 2;
-      const totalWidth = (enemyWidth + spacing) * totalEnemies;
+      const totalWidth = (enemyWidth + spacing) * Math.floor(canvas.width / (enemyWidth + spacing));
       let xStart = (canvas.width - totalWidth) / 2;
       for (let row = 0; row < fallingRows; row++) {
         let x = xStart;
-        for (let i = 0; i < totalEnemies; i++) {
-          enemies.push({ x, y: -row * 30, speed: enemySpeed });
+        while (x + enemyWidth < canvas.width) {
+          enemies.push({ x, y: -row * 30, speed: fallSpeed });
           x += enemyWidth + spacing;
         }
       }
@@ -181,8 +175,9 @@
 
     function endGame() {
       gameOver = true;
-      gameOverMessage.innerHTML = `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
-      gameOverScreen.style.display = "block";
+      document.getElementById("gameOverMessage").innerHTML =
+        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+      document.getElementById("gameOverScreen").style.display = "block";
     }
 
     function update() {
@@ -190,7 +185,7 @@
 
       if (shootTimer <= 0) {
         shoot();
-        shootTimer = shootCooldown;
+        shootTimer = 10;
       } else {
         shootTimer--;
       }
@@ -207,7 +202,7 @@
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
           lives--;
-          livesEl.textContent = "Lives: " + lives;
+          document.getElementById("lives").textContent = "Lives: " + lives;
           if (lives <= 0) {
             if (score > highScore) {
               highScore = score;
@@ -222,13 +217,10 @@
         const b = bullets[bi];
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
           const e = enemies[ei];
-          if (b.x < e.x + 24 && b.x + 4 > e.x && b.y < e.y + 24 && b.y + 10 > e.y) {
+          if (b.x < e.x + 24 && b.x + 2 > e.x && b.y < e.y + 24 && b.y + 16 > e.y) {
             enemies.splice(ei, 1);
             score++;
-            if (score !== lastScore) {
-              lastScore = score;
-              scoreEl.textContent = score;
-            }
+            document.getElementById("score").textContent = score;
             if (b.pierce > 0) {
               b.pierce--;
               break;
@@ -243,12 +235,7 @@
       if (enemies.length === 0 && !nextWaveReady) {
         nextWaveReady = true;
         setTimeout(() => {
-          waveCount++;
-          if (waveCount % 2 === 0) {
-            upgradePanel.style.display = "flex";
-          } else {
-            applyUpgrade(null);
-          }
+          showUpgradeOptions();
         }, 1000);
       }
     }
@@ -256,8 +243,8 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawPlayer();
-      for (const bullet of bullets) drawBullet(bullet);
-      for (const enemy of enemies) drawEnemy(enemy);
+      bullets.forEach(drawBullet);
+      enemies.forEach(drawEnemy);
     }
 
     function gameLoop() {
@@ -266,13 +253,20 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
+    function showUpgradeOptions() {
+      document.getElementById("upgradePanel").style.display = "flex";
+    }
+
     function applyUpgrade(type) {
-      if (type === 'faster') shootCooldown = Math.max(10, shootCooldown - 15);
+      if (type === 'faster') bulletSpeed += 2;
       else if (type === 'multi') bulletCount++;
       else if (type === 'pierce') piercingLevel++;
-      upgradePanel.style.display = "none";
+      document.getElementById("upgradePanel").style.display = "none";
       fallingRows++;
-      enemySpeed *= 1.25;
+      waveCount++;
+      if (waveCount % 3 === 0 && fallSpeed < 3.0) {
+        fallSpeed += 0.2;
+      }
       dropEnemyRows();
     }
 
@@ -283,7 +277,7 @@
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
-        player.y = touch.clientY - player.height * 1.5; // position slightly above finger
+        player.y = touch.clientY - player.height / 2;
         e.preventDefault();
       }
     }, { passive: false });
