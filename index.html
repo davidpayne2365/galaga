@@ -126,7 +126,7 @@
     let storyRevealCounter = 0;
     let storyRevealDelay = 3; // frames delay between letters
     let storyIndex = 0; // Track which story segment we're on
-    let scoreForNextStory = 30; // Show a new story segment every 30 points
+    // Removed scoreForNextStory since it's no longer needed
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -226,7 +226,7 @@
       document.getElementById("gameOverScreen").style.display = "flex";
     }
 
-    // Spawns a gothic-styled boss with cool attack patterns.
+    // Spawns a gothic-styled boss without progressing the story
     function spawnBoss() {
       // Clear stray enemies when a boss appears
       enemies.length = 0;
@@ -244,8 +244,7 @@
       };
       bosses.push(boss);
       
-      // Trigger a story progression when a boss appears
-      progressStory();
+      // No longer trigger story progression when a boss appears
     }
 
     // Progress the background story based on multiple triggers
@@ -325,12 +324,7 @@
                 score++;
                 updateUI();
                 
-                // Check if we should progress the story based on score
-                if (score >= scoreForNextStory) {
-                  progressStory();
-                  scoreForNextStory += 30; // Next story segment in 30 more points
-                }
-                
+                // We no longer progress the story based on score
                 if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
@@ -341,12 +335,7 @@
                 score++;
                 updateUI();
                 
-                // Check if we should progress the story based on score
-                if (score >= scoreForNextStory) {
-                  progressStory();
-                  scoreForNextStory += 30; // Next story segment in 30 more points
-                }
-                
+                // We no longer progress the story based on score
                 if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
@@ -366,12 +355,7 @@
                 score++;
                 updateUI();
                 
-                // Check if we should progress the story based on score
-                if (score >= scoreForNextStory) {
-                  progressStory();
-                  scoreForNextStory += 30; // Next story segment in 30 more points
-                }
-                
+                // We no longer progress the story based on score
                 if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
@@ -413,7 +397,7 @@
         boss.attackTimer--;
         if (boss.attackTimer <= 0) {
           const angle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
-          const bulletSpeed = 4;
+          const bulletSpeed = 2; // Reduced from 4 to 2 for slower bullets
           bossBullets.push({
             x: boss.x + boss.width / 2,
             y: boss.y + boss.height / 2,
@@ -436,8 +420,7 @@
               bosses.splice(bossIndex, 1);
               score += 30; // Bonus for defeating a boss
               bossDefeatedCount++;
-              // Boss defeat always triggers a new story segment
-              progressStory();
+              // No longer trigger story on boss defeat
               updateUI();
               if (bossDefeatedCount < 10) {
                 nextBossScore = (bossDefeatedCount + 1) * 100;
