@@ -30,27 +30,6 @@
       padding: 0.3rem 0.8rem;
       border-radius: 8px;
     }
-    #bossWarning {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(139, 0, 0, 0.8);
-      color: white;
-      font-size: 2.5rem;
-      padding: 1.5rem 2.5rem;
-      border-radius: 10px;
-      border: 3px solid darkred;
-      text-align: center;
-      z-index: 15;
-      animation: pulse 1s infinite alternate;
-      text-shadow: 0 0 10px red;
-    }
-    @keyframes pulse {
-      from { box-shadow: 0 0 10px darkred; }
-      to { box-shadow: 0 0 25px red; }
-    }
     #gameOverScreen {
       display: none;
       position: fixed;
@@ -147,7 +126,7 @@
     let storyRevealCounter = 0;
     let storyRevealDelay = 3; // frames delay between letters
     let storyIndex = 0; // Track which story segment we're on
-    let scoreForNextStory = 20; // Show a new story segment every 20 points
+    let scoreForNextStory = 30; // Show a new story segment every 30 points
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -249,27 +228,24 @@
 
     // Spawns a gothic-styled boss with cool attack patterns.
     function spawnBoss() {
-      const bossWarning = document.getElementById("bossWarning");
-      bossWarning.style.display = "block";
+      // Clear stray enemies when a boss appears
+      enemies.length = 0;
+      const boss = {
+        x: canvas.width / 2 - 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        health: 30 + Math.floor(score / 100) * 5,
+        dx: 2,
+        attackTimer: 100,
+        emoji: "🧛",
+        color: "darkred",
+        scale: 1.5
+      };
+      bosses.push(boss);
       
-      setTimeout(() => {
-        bossWarning.style.display = "none";
-        // Clear stray enemies when a boss appears
-        enemies.length = 0;
-        const boss = {
-          x: canvas.width / 2 - 50,
-          y: 50,
-          width: 100,
-          height: 100,
-          health: 30 + Math.floor(score / 100) * 5,
-          dx: 2,
-          attackTimer: 100,
-          emoji: "🧛",
-          color: "darkred",
-          scale: 1.5
-        };
-        bosses.push(boss);
-      }, 2000);
+      // Trigger a story progression when a boss appears
+      progressStory();
     }
 
     // Progress the background story based on multiple triggers
@@ -352,11 +328,10 @@
                 // Check if we should progress the story based on score
                 if (score >= scoreForNextStory) {
                   progressStory();
-                  scoreForNextStory += 20; // Next story segment in 20 more points
+                  scoreForNextStory += 30; // Next story segment in 30 more points
                 }
                 
-                if (score >= nextBossScore && bosses.length === 0 &&
-                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
+                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
@@ -369,11 +344,10 @@
                 // Check if we should progress the story based on score
                 if (score >= scoreForNextStory) {
                   progressStory();
-                  scoreForNextStory += 20; // Next story segment in 20 more points
+                  scoreForNextStory += 30; // Next story segment in 30 more points
                 }
                 
-                if (score >= nextBossScore && bosses.length === 0 &&
-                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
+                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
@@ -395,11 +369,10 @@
                 // Check if we should progress the story based on score
                 if (score >= scoreForNextStory) {
                   progressStory();
-                  scoreForNextStory += 20; // Next story segment in 20 more points
+                  scoreForNextStory += 30; // Next story segment in 30 more points
                 }
                 
-                if (score >= nextBossScore && bosses.length === 0 &&
-                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
+                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
