@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Galaga Bar Blast Lite - Emoji Edition</title>
+  <title>Galaga Bar Blast Lite - Vampire Emoji Edition</title>
   <style>
-    /* Reset and base styling */
     html, body {
       margin: 0;
       padding: 0;
@@ -21,23 +20,10 @@
       width: 100vw;
       height: 100vh;
     }
-    /* UI Overlays */
-    #score {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 2rem;
-      z-index: 10;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-    }
     #lives {
       position: fixed;
-      top: 60px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 10px;
+      left: 10px;
       font-size: 1.8rem;
       z-index: 10;
       background: rgba(0, 0, 0, 0.4);
@@ -76,63 +62,15 @@
     #restartBtn:hover {
       background-color: #444;
     }
-    /* Bullet Selection Panel */
-    #bulletSelection {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 15;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 0.5rem 1rem;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      font-size: 1.5rem;
-    }
-    #bulletSelection div {
-      font-weight: bold;
-      margin-right: 0.5rem;
-    }
-    .bulletBtn {
-      background: #fff;
-      border: 2px solid #fff;
-      border-radius: 50%;
-      width: 3rem;
-      height: 3rem;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-size: 1.6rem;
-    }
-    .bulletBtn.selected, .bulletBtn:hover {
-      background: #ffcc00;
-      border-color: #ffcc00;
-      color: #000;
-    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <div id="score">Score: 0 | Wave: 1</div>
   <div id="lives">Lives: 10</div>
-
   <div id="gameOverScreen">
     <div class="message" id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
   </div>
-
-  <div id="bulletSelection">
-    <div>Select Your Bullet:</div>
-    <button class="bulletBtn" data-type="regular">🍸</button>
-    <button class="bulletBtn" data-type="slow">🍷</button>
-    <button class="bulletBtn" data-type="explosive">🍹</button>
-    <button class="bulletBtn" data-type="piercing">☕</button>
-  </div>
-
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -148,6 +86,7 @@
     let fallSpeed = 0.5;
     let shootTimer = 0;
     let globalSlowTimer = 0;
+    let nextWaveReady = false;
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -159,19 +98,17 @@
 
     const bullets = [];
     const enemies = [];
-    let fallingRows = 1;
 
     const bulletEmojis = {
-      regular: "🍸",
-      slow: "🍷",
-      explosive: "🍹",
-      piercing: "☕"
+      regular: "🌹",
+      slow: "🌹",
+      explosive: "🌹",
+      piercing: "🌹"
     };
 
     let currentBulletType = "regular";
 
     function updateUI() {
-      document.getElementById("score").textContent = "Score: " + score + " | Wave: " + waveCount;
       document.getElementById("lives").textContent = "Lives: " + lives;
     }
 
@@ -196,20 +133,26 @@
     }
 
     function dropEnemyRows() {
-      const enemyWidth = 24;
-      const spacing = 5;
-      const enemiesPerRow = Math.floor(canvas.width / (enemyWidth + spacing));
-      const totalWidth = enemiesPerRow * (enemyWidth + spacing);
-      let xStart = (canvas.width - totalWidth) / 2;
-      for (let row = 0; row < fallingRows; row++) {
-        let x = xStart;
-        while (x + enemyWidth < canvas.width) {
-          const enemyEmojis = ["🍺", "🍷", "🍸", "🍹"];
-          const randomEmoji = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
-          enemies.push({ x: x, y: -row * 30, speed: fallSpeed, emoji: randomEmoji });
-          x += enemyWidth + spacing;
+      const interval = 300;
+      let x = 60;
+      let direction = 1;
+      const margin = 60;
+      setInterval(() => {
+        if (!gameOver) {
+          const emojiOptions = ["🦇", "🩸"];
+          const emoji = emojiOptions[Math.floor(Math.random() * emojiOptions.length)];
+          enemies.push({
+            x: Math.min(canvas.width - margin, Math.max(margin, x % canvas.width)),
+            y: -30,
+            speed: fallSpeed + Math.random() * 0.5,
+            dx: direction * 0.3,
+            emoji: emoji
+          });
+          x += 40 * direction;
+          if (x > canvas.width - margin || x < margin) direction *= -1;
+          x = Math.max(margin, Math.min(canvas.width - margin, x));
         }
-      }
+      }, interval);
     }
 
     function shoot() {
@@ -254,6 +197,8 @@
         let e = enemies[i];
         let speedFactor = (globalSlowTimer > 0) ? 0.5 : 1;
         e.y += e.speed * speedFactor;
+        e.x += e.dx || 0;
+        if (e.x < 0 || e.x > canvas.width - 24) e.dx *= -1;
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
           lives--;
@@ -316,7 +261,6 @@
         nextWaveReady = true;
         setTimeout(() => {
           waveCount++;
-          fallingRows++;
           if (waveCount % 5 === 0 && fallSpeed < 3.0) fallSpeed += 0.2;
           updateUI();
           nextWaveReady = false;
@@ -339,30 +283,21 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
+    // Updated event listeners with the new y-offset for player positioning
     canvas.addEventListener("mousemove", (e) => {
       player.x = e.clientX - player.width / 2;
-      player.y = e.clientY - player.height / 2;
+      player.y = e.clientY - player.height * 1.5;
     });
+
     canvas.addEventListener("touchmove", (e) => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         player.x = touch.clientX - player.width / 2;
-        player.y = touch.clientY - player.height / 2;
+        player.y = touch.clientY - player.height * 1.5;
         e.preventDefault();
       }
     }, { passive: false });
 
-    const bulletButtons = document.querySelectorAll(".bulletBtn");
-    bulletButtons.forEach(button => {
-      button.addEventListener("click", function() {
-        currentBulletType = this.getAttribute("data-type");
-        bulletButtons.forEach(btn => btn.classList.remove("selected"));
-        this.classList.add("selected");
-      });
-    });
-    document.querySelector(".bulletBtn[data-type='regular']").classList.add("selected");
-
-    let nextWaveReady = false;
     dropEnemyRows();
     gameLoop();
   </script>
