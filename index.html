@@ -83,12 +83,14 @@
     #restartBtn:hover {
       background-color: #444;
     }
+    /* No story container needed as it will be drawn on canvas */
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
   <div id="lives">Score: 0</div>
   <div id="bossWarning">WARNING! BOSS APPROACHING!</div>
+  <!-- Story will be drawn directly on canvas -->
   <div id="gameOverScreen">
     <div class="message" id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
@@ -100,7 +102,7 @@
     canvas.height = window.innerHeight;
 
     // Add side padding to create invisible boundaries
-    const sidePadding = Math.min(80, canvas.width * 0.1); // Either 80px or 10% of screen width, whichever is smaller
+    const sidePadding = Math.min(80, canvas.width * 0.1);
     
     let score = 0;
     let lives = 1;
@@ -108,7 +110,44 @@
     let fallSpeed = 0.5;
     let shootTimer = 0;
     let globalSlowTimer = 0;
-    let nextBossScore = 100; // Score threshold for next boss appearance
+    let nextBossScore = 100; // Boss spawns at 100 points and every 100 points thereafter
+    let bossDefeatedCount = 0;
+
+    // Story variables for background narrative
+    const storySegments = [
+      "Under the crimson skies, the ancient castle loomed as a monument to forgotten sorrow. Shadows whispered secrets to those who dared approach.",
+      "Within its forsaken halls, a timeless curse stirred. The walls, steeped in ancestral grief, echoed with silent dirges of despair.",
+      "In the obsidian corridors, phantoms danced beneath flickering candlelight, each step a recollection of eternal damnation.",
+      "The bitter winds carried tales of a solitary knight—whose burning resolve sought to vanquish the cursed lord dwelling within.",
+      "As the veil between night and day thinned, the castle awakened; its gargoyles snarled and the ground trembled with the weight of ages.",
+      "Deep within the labyrinth of despair, a sanguine chronicle unfolded—a narrative woven with blood, betrayal, and bittersweet legacy.",
+      "Amid crumbling battlements and echoing chants, the battle between mortal valor and immortal malice reached a fevered pitch.",
+      "The nocturne of suffering swelled, as each fallen enemy paved the path toward confronting the eternal sovereign of shadow.",
+      "In a convergence of fate and fury, the knight pierced the veil of darkness, illuminating fragments of a cursed lineage.",
+      "At the climax of the relentless siege, the final confrontation stirred—an elegy of blood and twilight, where destiny and doom entwined in eternal embrace.",
+      // Additional story segments for more frequent display
+      "Blood-red moons cast their eerie glow over the decaying ruins, illuminating the path of the damned who wandered these unhallowed grounds.",
+      "Whispers of the forgotten ones echoed through hidden passages, tales of sorrow and betrayal that haunted the living.",
+      "Ancient tomes in the castle library held forbidden knowledge, their pages stained with the tears of those who sought to break the curse.",
+      "The portrait gallery housed the faces of those who had fallen to darkness, their eyes seeming to follow any who dared enter.",
+      "Beneath the castle lay catacombs of unspeakable horror, where experiments of ungodly nature had birthed abominations.",
+      "In the grand ballroom, phantom dancers still twirled to unheard music, eternally trapped in their final moments of merriment.",
+      "The castle gardens grew twisted roses that bloomed only at midnight, petals black as night and sweet as death.",
+      "Suits of armor stood sentinel in the great hall, some said to still house the spirits of loyal knights bound to service beyond death.",
+      "The astronomy tower's instruments pointed to dark stars, cosmic entities that whispered madness to those who observed them too long.",
+      "Time itself moved strangely within these walls, minutes stretching to hours and centuries condensing to heartbeats.",
+      "Every stone, every brick of the castle had been set with purpose, forming arcane symbols visible only to those with second sight.",
+      "Rainfall turned to blood when it touched the castle grounds, nourishing the strange flora that grew in twisted patterns.",
+      "Those who escaped spoke of rooms that appeared and disappeared, corridors that led to different destinations each time traveled.",
+      "The lord of the castle was said to be neither living nor dead, but existing in a state of perpetual transformation.",
+      "Windows to the outside world sometimes showed landscapes from different realms, vistas impossible yet tantalizing in their beauty."
+    ];
+    let currentStoryText = "";
+    let storyLetterIndex = 0;
+    let storyRevealCounter = 0;
+    let storyRevealDelay = 3; // frames delay between letters
+    let storyIndex = 0; // Track which story segment we're on
+    let scoreForNextStory = 20; // Show a new story segment every 20 points
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -162,13 +201,12 @@
       ctx.fillText(e.emoji, e.x, e.y);
     }
 
-    // This function spawns normal enemy rows at a fixed interval
+    // Spawns normal enemy rows at a fixed interval
     function dropEnemyRows() {
       const interval = 300;
-      let x = sidePadding + 60; // Start position respects side padding
+      let x = sidePadding + 60;
       let direction = 1;
       
-      // Store the interval ID so we can clear it later when needed
       const enemyInterval = setInterval(() => {
         if (!gameOver && enemies.length < 50) {
           const emojiOptions = ["🦇", "🩸"];
@@ -181,20 +219,18 @@
             emoji: emoji
           });
           x += 40 * direction;
-          // Changed boundary check to respect side padding
           if (x > canvas.width - sidePadding - 24 || x < sidePadding) direction *= -1;
           x = Math.max(sidePadding, Math.min(canvas.width - sidePadding - 24, x));
         }
       }, interval);
       
-      // Return the interval ID so it can be cleared when needed
       return enemyInterval;
     }
 
     function shoot() {
       const bullet = {
-        x: player.x + player.width / 2 - 12, // Center the bullet on the tip of the triangle
-        y: player.y, // Start at the tip of the triangle
+        x: player.x + player.width / 2 - 12,
+        y: player.y,
         type: currentBulletType,
         emoji: bulletEmojis[currentBulletType]
       };
@@ -213,35 +249,46 @@
 
     // Spawns a gothic-styled boss with cool attack patterns.
     function spawnBoss() {
-      // Show warning message before boss appears
       const bossWarning = document.getElementById("bossWarning");
       bossWarning.style.display = "block";
       
-      // Hide warning and spawn boss after 2 seconds
       setTimeout(() => {
         bossWarning.style.display = "none";
-        
-        // Clear any stray enemies when a boss appears
+        // Clear stray enemies when a boss appears
         enemies.length = 0;
-        
         const boss = {
-          x: canvas.width / 2 - 50, // Wider boss
+          x: canvas.width / 2 - 50,
           y: 50,
-          width: 100, // Increased size
-          height: 100, // Increased size
-          health: 30 + Math.floor(score / 100) * 5, // Increases with score for difficulty
+          width: 100,
+          height: 100,
+          health: 30 + Math.floor(score / 100) * 5,
           dx: 2,
-          attackTimer: 100, // Frames until next attack; will decrease as difficulty increases
-          emoji: "🧛",  // Gothic vampire boss emoji
+          attackTimer: 100,
+          emoji: "🧛",
           color: "darkred",
-          scale: 1.5 // Scale factor for drawing
+          scale: 1.5
         };
         bosses.push(boss);
-        
-        // Calculate next boss score threshold
-        nextBossScore = score + 150;
       }, 2000);
     }
+
+    // Progress the background story based on multiple triggers
+    function progressStory() {
+      if (storyIndex < storySegments.length) {
+        currentStoryText = storySegments[storyIndex];
+        storyLetterIndex = 0;
+        storyRevealCounter = 0;
+        storyIndex++;
+      } else {
+        // If we've gone through all segments, cycle back to a random one
+        const randomIndex = Math.floor(Math.random() * storySegments.length);
+        currentStoryText = storySegments[randomIndex];
+        storyLetterIndex = 0;
+        storyRevealCounter = 0;
+      }
+    }
+
+    // Story will be drawn directly in the draw function
 
     function update() {
       if (gameOver) return;
@@ -261,20 +308,27 @@
         if (b.y < 0) bullets.splice(i, 1);
       }
 
+      // Update story text for typewriter effect
+      if (currentStoryText && storyLetterIndex < currentStoryText.length) {
+        storyRevealCounter++;
+        if (storyRevealCounter >= storyRevealDelay) {
+          storyLetterIndex++;
+          storyRevealCounter = 0;
+        }
+      }
+
       // Slow effect timer for enemies
       if (globalSlowTimer > 0) globalSlowTimer--;
 
       // Update normal enemies
       for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
-        let speedFactor = (globalSlowTimer > 0) ? 0.5 : 1;
+        const speedFactor = (globalSlowTimer > 0) ? 0.5 : 1;
         e.y += e.speed * speedFactor;
         e.x += e.dx || 0;
-        // Updated boundary check to respect side padding
         if (e.x < sidePadding || e.x > canvas.width - sidePadding - 24) e.dx *= -1;
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
-          // Game over if any enemy reaches the bottom
           endGame();
           return;
         }
@@ -282,38 +336,47 @@
 
       // Check collisions for player bullets and normal enemies
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
-        let b = bullets[bi];
+        const b = bullets[bi];
         let bulletHit = false;
         
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
-          let e = enemies[ei];
+          const e = enemies[ei];
           if (b.x < e.x + 24 && b.x + 24 > e.x && b.y < e.y + 24 && b.y + 24 > e.y) {
             bulletHit = true;
-            
             switch (b.type) {
               case "regular":
                 enemies.splice(ei, 1);
                 score++;
                 updateUI();
                 
-                // Check if we reached boss score threshold
-                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                // Check if we should progress the story based on score
+                if (score >= scoreForNextStory) {
+                  progressStory();
+                  scoreForNextStory += 20; // Next story segment in 20 more points
+                }
+                
+                if (score >= nextBossScore && bosses.length === 0 &&
+                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
-                
               case "slow":
                 enemies.splice(ei, 1);
                 globalSlowTimer = 120;
                 score++;
                 updateUI();
                 
-                // Check if we reached boss score threshold
-                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                // Check if we should progress the story based on score
+                if (score >= scoreForNextStory) {
+                  progressStory();
+                  scoreForNextStory += 20; // Next story segment in 20 more points
+                }
+                
+                if (score >= nextBossScore && bosses.length === 0 &&
+                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
-                
               case "explosive":
                 enemies.splice(ei, 1);
                 const explosionRadius = 50;
@@ -329,31 +392,36 @@
                 score++;
                 updateUI();
                 
-                // Check if we reached boss score threshold
-                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                // Check if we should progress the story based on score
+                if (score >= scoreForNextStory) {
+                  progressStory();
+                  scoreForNextStory += 20; // Next story segment in 20 more points
+                }
+                
+                if (score >= nextBossScore && bosses.length === 0 &&
+                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
                   spawnBoss();
                 }
                 break;
-                
               case "piercing":
                 enemies.splice(ei, 1);
                 score++;
                 updateUI();
                 
-                // Check if we reached boss score threshold
-                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
-                  spawnBoss();
+                // Check if we should progress the story based on score
+                if (score >= scoreForNextStory) {
+                  progressStory();
+                  scoreForNextStory += 20; // Next story segment in 20 more points
                 }
                 
-                b.pierce--;
-                if (b.pierce <= 0) {
-                  bulletHit = true;
-                } else {
-                  bulletHit = false; // Allow the bullet to continue
+                if (score >= nextBossScore && bosses.length === 0 &&
+                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
+                  spawnBoss();
                 }
+                b.pierce--;
+                bulletHit = b.pierce <= 0;
                 break;
             }
-            
             if (bulletHit) {
               bullets.splice(bi, 1);
               break;
@@ -362,63 +430,63 @@
         }
       }
 
-      // Update bosses (if any are active)
+      // Update bosses
       bosses.forEach((boss, bossIndex) => {
-        // Move boss horizontally; bounce off edges with side padding
         boss.x += boss.dx;
         if (boss.x < sidePadding || boss.x > canvas.width - sidePadding - boss.width) {
           boss.dx *= -1;
         }
         
-        // Handle boss attack: count down timer and fire a projectile toward the player
         boss.attackTimer--;
         if (boss.attackTimer <= 0) {
           const angle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
           const bulletSpeed = 4;
-          const bossBullet = {
+          bossBullets.push({
             x: boss.x + boss.width / 2,
             y: boss.y + boss.height / 2,
             vx: Math.cos(angle) * bulletSpeed,
             vy: Math.sin(angle) * bulletSpeed,
             emoji: "☠️"
-          };
-          bossBullets.push(bossBullet);
-          // Reset attack timer; becomes faster with increasing score but never too fast
+          });
           boss.attackTimer = 100 - Math.floor(score / 100) * 5;
           if (boss.attackTimer < 40) boss.attackTimer = 40;
         }
         
         // Check collision between player's bullets and the boss
         for (let bi = bullets.length - 1; bi >= 0; bi--) {
-          let b = bullets[bi];
-          if (b.x < boss.x + boss.width && b.x + 24 > boss.x && b.y < boss.y + boss.height && b.y + 24 > boss.y) {
+          const b = bullets[bi];
+          if (b.x < boss.x + boss.width && b.x + 24 > boss.x &&
+              b.y < boss.y + boss.height && b.y + 24 > boss.y) {
             bullets.splice(bi, 1);
             boss.health--;
-            
             if (boss.health <= 0) {
               bosses.splice(bossIndex, 1);
-              score += 30;  // Bonus score for defeating a boss
+              score += 30; // Bonus for defeating a boss
+              bossDefeatedCount++;
+              // Boss defeat always triggers a new story segment
+              progressStory();
               updateUI();
+              if (bossDefeatedCount < 10) {
+                nextBossScore = (bossDefeatedCount + 1) * 100;
+              }
               break;
             }
           }
         }
       });
 
-      // Update boss bullets and check for collision with player
+      // Update boss bullets and check collision with player
       for (let i = bossBullets.length - 1; i >= 0; i--) {
-        let bb = bossBullets[i];
+        const bb = bossBullets[i];
         bb.x += bb.vx;
         bb.y += bb.vy;
-        
         if (bb.x < 0 || bb.x > canvas.width || bb.y < 0 || bb.y > canvas.height) {
           bossBullets.splice(i, 1);
           continue;
         }
-        
-        if (bb.x < player.x + player.width && bb.x + 24 > player.x && bb.y < player.y + player.height && bb.y + 24 > player.y) {
+        if (bb.x < player.x + player.width && bb.x + 24 > player.x &&
+            bb.y < player.y + player.height && bb.y + 24 > player.y) {
           bossBullets.splice(i, 1);
-          // Game over immediately if hit by boss bullet
           endGame();
           return;
         }
@@ -427,28 +495,66 @@
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw the background story text with a typewriter effect
+      if (currentStoryText) {
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.font = "italic 22px Georgia, serif";
+        ctx.fillStyle = "#f0f0f0";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "#800000";
+        ctx.shadowBlur = 5;
+        
+        const textToShow = currentStoryText.substring(0, storyLetterIndex);
+        // Calculate line breaks to wrap text nicely
+        const maxWidth = canvas.width * 0.8;
+        const lineHeight = 30;
+        const lines = [];
+        let line = '';
+        const words = textToShow.split(' ');
+        
+        for (const word of words) {
+          const testLine = line + word + ' ';
+          const metrics = ctx.measureText(testLine);
+          const testWidth = metrics.width;
+          
+          if (testWidth > maxWidth && line !== '') {
+            lines.push(line);
+            line = word + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+        
+        // Draw text centered vertically at 1/3 of the canvas height
+        const totalTextHeight = lines.length * lineHeight;
+        const startY = canvas.height / 3 - totalTextHeight / 2;
+        
+        lines.forEach((line, index) => {
+          ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
+        });
+        
+        ctx.restore();
+      }
+      
       drawPlayer();
       bullets.forEach(drawBullet);
       enemies.forEach(drawEnemy);
-      
-      // Draw bosses with a larger font size and a health indicator
       bosses.forEach(boss => {
-        ctx.font = "80px Arial"; // Much larger font for bosses
+        ctx.font = "80px Arial";
         ctx.fillStyle = boss.color;
         ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
-        
-        // Add a glowing effect around the boss
         ctx.shadowColor = "red";
         ctx.shadowBlur = 15;
         ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
-        ctx.shadowBlur = 0; // Reset shadow
-        
-        // Display boss health above the boss
-        ctx.font = "18px Arial"; // Larger health text
+        ctx.shadowBlur = 0;
+        ctx.font = "18px Arial";
         ctx.fillStyle = "red";
         ctx.fillText("BOSS HP: " + boss.health, boss.x, boss.y - 15);
       });
-      
       bossBullets.forEach(drawBossBullet);
     }
 
@@ -458,32 +564,42 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
-    // Fixed mouse/touch position calculation to properly position player triangle
     canvas.addEventListener("mousemove", (e) => {
-      // Apply side padding to restrict player movement
       player.x = Math.max(sidePadding, Math.min(e.clientX - player.width / 2, canvas.width - sidePadding - player.width));
-      // Position player above the pointer by a comfortable distance
-      player.y = e.clientY - player.height * 3; // Increased offset
+      player.y = e.clientY - player.height * 3;
     });
 
     canvas.addEventListener("touchmove", (e) => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
-        // Apply side padding to restrict player movement
         player.x = Math.max(sidePadding, Math.min(touch.clientX - player.width / 2, canvas.width - sidePadding - player.width));
-        // Position player above the touch point by a comfortable distance for mobile
-        player.y = touch.clientY - player.height * 4; // Larger offset for mobile
+        player.y = touch.clientY - player.height * 4;
         e.preventDefault();
       }
     }, { passive: false });
 
-    // Start by spawning enemy rows for the first wave
+    // Handle window resize
+    window.addEventListener("resize", () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // Initialize with first story segment to welcome the player
+    currentStoryText = "Welcome, vampire hunter. Prepare to face the darkness...";
+    storyLetterIndex = 0;
+    storyRevealCounter = 0;
+    storyIndex = 0;
+    
+    // Set a timer to automatically progress story for inactive players
+    setInterval(() => {
+      if (!gameOver && currentStoryText && storyLetterIndex >= currentStoryText.length) {
+        // If current story segment is fully revealed, show another one after 15 seconds
+        progressStory();
+      }
+    }, 15000);
+    
     currentEnemyInterval = dropEnemyRows();
-    
-    // Initialize the first UI update
     updateUI();
-    
-    // Start the game loop
     gameLoop();
   </script>
 </body>
