@@ -103,13 +103,12 @@
     const sidePadding = Math.min(80, canvas.width * 0.1); // Either 80px or 10% of screen width, whichever is smaller
     
     let score = 0;
-    let lives = 1; // Changed to only 1 life
+    let lives = 1;
     let gameOver = false;
-    let waveCount = 1;
     let fallSpeed = 0.5;
     let shootTimer = 0;
     let globalSlowTimer = 0;
-    let nextWaveReady = false;
+    let nextBossScore = 300; // Score threshold for next boss appearance
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -121,7 +120,6 @@
 
     const bullets = [];
     const enemies = [];
-    // New arrays for boss enemies and their bullets
     const bosses = [];
     const bossBullets = [];
 
@@ -133,6 +131,7 @@
     };
 
     let currentBulletType = "regular";
+    let currentEnemyInterval = null;
 
     function updateUI() {
       document.getElementById("lives").textContent = "Score: " + score;
@@ -169,7 +168,7 @@
       let x = sidePadding + 60; // Start position respects side padding
       let direction = 1;
       
-      // Store the interval ID so we can clear it later when wave ends
+      // Store the interval ID so we can clear it later when needed
       const enemyInterval = setInterval(() => {
         if (!gameOver && enemies.length < 50) {
           const emojiOptions = ["🦇", "🩸"];
@@ -205,7 +204,6 @@
       bullets.push(bullet);
     }
 
-    // Remove high score functionality from endGame()
     function endGame() {
       gameOver = true;
       document.getElementById("gameOverMessage").innerHTML =
@@ -231,7 +229,7 @@
           y: 50,
           width: 100, // Increased size
           height: 100, // Increased size
-          health: 20 + waveCount * 5, // Increases with wave count for difficulty
+          health: 30 + Math.floor(score / 100) * 5, // Increases with score for difficulty
           dx: 2,
           attackTimer: 100, // Frames until next attack; will decrease as difficulty increases
           emoji: "🧛",  // Gothic vampire boss emoji
@@ -239,6 +237,9 @@
           scale: 1.5 // Scale factor for drawing
         };
         bosses.push(boss);
+        
+        // Calculate next boss score threshold
+        nextBossScore = score + 300;
       }, 2000);
     }
 
@@ -282,21 +283,37 @@
       // Check collisions for player bullets and normal enemies
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
         let b = bullets[bi];
+        let bulletHit = false;
+        
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
           let e = enemies[ei];
           if (b.x < e.x + 24 && b.x + 24 > e.x && b.y < e.y + 24 && b.y + 24 > e.y) {
+            bulletHit = true;
+            
             switch (b.type) {
               case "regular":
                 enemies.splice(ei, 1);
-                bullets.splice(bi, 1);
                 score++;
+                updateUI();
+                
+                // Check if we reached boss score threshold
+                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                  spawnBoss();
+                }
                 break;
+                
               case "slow":
                 enemies.splice(ei, 1);
                 globalSlowTimer = 120;
-                bullets.splice(bi, 1);
                 score++;
+                updateUI();
+                
+                // Check if we reached boss score threshold
+                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                  spawnBoss();
+                }
                 break;
+                
               case "explosive":
                 enemies.splice(ei, 1);
                 const explosionRadius = 50;
@@ -309,17 +326,38 @@
                     score++;
                   }
                 }
-                bullets.splice(bi, 1);
+                score++;
+                updateUI();
+                
+                // Check if we reached boss score threshold
+                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                  spawnBoss();
+                }
                 break;
+                
               case "piercing":
                 enemies.splice(ei, 1);
                 score++;
+                updateUI();
+                
+                // Check if we reached boss score threshold
+                if (score >= nextBossScore && bosses.length === 0 && document.getElementById("bossWarning").style.display !== "block") {
+                  spawnBoss();
+                }
+                
                 b.pierce--;
-                if (b.pierce <= 0) bullets.splice(bi, 1);
+                if (b.pierce <= 0) {
+                  bulletHit = true;
+                } else {
+                  bulletHit = false; // Allow the bullet to continue
+                }
                 break;
             }
-            updateUI();
-            break;
+            
+            if (bulletHit) {
+              bullets.splice(bi, 1);
+              break;
+            }
           }
         }
       }
@@ -331,6 +369,7 @@
         if (boss.x < sidePadding || boss.x > canvas.width - sidePadding - boss.width) {
           boss.dx *= -1;
         }
+        
         // Handle boss attack: count down timer and fire a projectile toward the player
         boss.attackTimer--;
         if (boss.attackTimer <= 0) {
@@ -344,19 +383,22 @@
             emoji: "☠️"
           };
           bossBullets.push(bossBullet);
-          // Reset attack timer; becomes faster with increasing wave count but never too fast
-          boss.attackTimer = 100 - waveCount * 2;
+          // Reset attack timer; becomes faster with increasing score but never too fast
+          boss.attackTimer = 100 - Math.floor(score / 100) * 5;
           if (boss.attackTimer < 40) boss.attackTimer = 40;
         }
+        
         // Check collision between player's bullets and the boss
         for (let bi = bullets.length - 1; bi >= 0; bi--) {
           let b = bullets[bi];
           if (b.x < boss.x + boss.width && b.x + 24 > boss.x && b.y < boss.y + boss.height && b.y + 24 > boss.y) {
             bullets.splice(bi, 1);
             boss.health--;
+            
             if (boss.health <= 0) {
               bosses.splice(bossIndex, 1);
-              score += 10;  // Bonus score for defeating a boss
+              score += 30;  // Bonus score for defeating a boss
+              updateUI();
               break;
             }
           }
@@ -368,10 +410,12 @@
         let bb = bossBullets[i];
         bb.x += bb.vx;
         bb.y += bb.vy;
+        
         if (bb.x < 0 || bb.x > canvas.width || bb.y < 0 || bb.y > canvas.height) {
           bossBullets.splice(i, 1);
           continue;
         }
+        
         if (bb.x < player.x + player.width && bb.x + 24 > player.x && bb.y < player.y + player.height && bb.y + 24 > player.y) {
           bossBullets.splice(i, 1);
           // Game over immediately if hit by boss bullet
@@ -379,42 +423,6 @@
           return;
         }
       }
-
-      // Store the current enemy spawn interval ID
-    let currentEnemyInterval = null;
-    
-    // Wave management: when there are no remaining enemies or bosses, prepare the next wave.
-    if (enemies.length === 0 && bosses.length === 0 && !nextWaveReady) {
-      nextWaveReady = true;
-      
-      // Clear existing enemy spawn interval if it exists
-      if (currentEnemyInterval) {
-        clearInterval(currentEnemyInterval);
-        currentEnemyInterval = null;
-      }
-      
-      setTimeout(() => {
-        waveCount++;
-        console.log("Starting wave:", waveCount); // Debug log
-        
-        // Increase enemy fall speed every 5 waves
-        if (waveCount % 5 === 0 && fallSpeed < 3.0) fallSpeed += 0.2;
-        
-        updateUI();
-        nextWaveReady = false;
-        
-        // Every third wave is a boss wave; otherwise, resume enemy rows.
-        if (waveCount % 3 === 0) {
-          console.log("Spawning boss"); // Debug log
-          spawnBoss();
-        } else {
-          console.log("Starting enemy wave"); // Debug log
-          // Start a new enemy interval
-          currentEnemyInterval = dropEnemyRows();
-        }
-      }, 1000);
-      return;
-    }
     }
 
     function draw() {
@@ -440,6 +448,7 @@
         ctx.fillStyle = "red";
         ctx.fillText("BOSS HP: " + boss.health, boss.x, boss.y - 15);
       });
+      
       bossBullets.forEach(drawBossBullet);
     }
 
@@ -469,7 +478,7 @@
     }, { passive: false });
 
     // Start by spawning enemy rows for the first wave
-    let currentEnemyInterval = dropEnemyRows();
+    currentEnemyInterval = dropEnemyRows();
     
     // Initialize the first UI update
     updateUI();
