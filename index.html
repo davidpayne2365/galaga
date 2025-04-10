@@ -10,7 +10,6 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      background: linear-gradient(135deg, #000000, #434343);
       overflow: hidden;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       color: #fff;
@@ -89,8 +88,8 @@
     let fallSpeed = 0.5;
     let shootTimer = 0;
     let globalSlowTimer = 0;
-    let nextBossScore = 100; // Boss spawns at 100 points and every 100 points thereafter
-    let bossDefeatedCount = 0;
+    let finalBossSpawned = false; // Track if final boss has spawned
+    let storyComplete = false; // Track if story is complete
 
     // Story variables for background narrative
     const storySegments = [
@@ -126,7 +125,19 @@
     let storyRevealCounter = 0;
     let storyRevealDelay = 3; // frames delay between letters
     let storyIndex = 0; // Track which story segment we're on
-    // Removed scoreForNextStory since it's no longer needed
+    // Background image variables
+    const backgroundImages = [
+      "castle_blue.png",
+      "castle_green.png", 
+      "castle_indigo.png",
+      "castle_orange.png",
+      "castle_rainbow.png",
+      "castle_red.png",
+      "castle_violet.png",
+      "castle_yellow.png"
+    ];
+    let currentBackgroundIndex = 0;
+    let backgroundImage = new Image();
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -226,41 +237,74 @@
       document.getElementById("gameOverScreen").style.display = "flex";
     }
 
-    // Spawns a gothic-styled boss without progressing the story
-    function spawnBoss() {
-      // Clear stray enemies when a boss appears
-      enemies.length = 0;
-      const boss = {
-        x: canvas.width / 2 - 50,
-        y: 50,
-        width: 100,
-        height: 100,
-        health: 30 + Math.floor(score / 100) * 5,
-        dx: 2,
-        attackTimer: 100,
-        emoji: "🧛",
-        color: "darkred",
-        scale: 1.5
-      };
-      bosses.push(boss);
+    // Spawns the final boss after the story is complete
+    function spawnFinalBoss() {
+      if (finalBossSpawned) return;
       
-      // No longer trigger story progression when a boss appears
+      // Display a final boss warning message in the story text
+      currentStoryText = "THE VAMPIRE LORD APPROACHES! PREPARE FOR THE FINAL BATTLE!";
+      storyLetterIndex = 0;
+      storyRevealCounter = 0;
+      
+      // Clear all enemies
+      enemies.length = 0;
+      
+      // Change background to the most dramatic one (rainbow)
+      backgroundImage.src = "castle_rainbow.png";
+      
+      // Create the final boss with more health and abilities
+      setTimeout(() => {
+        if (!gameOver) {
+          const boss = {
+            x: canvas.width / 2 - 70,
+            y: 80,
+            width: 140,
+            height: 140,
+            health: 100,
+            dx: 3,
+            attackTimer: 80,
+            emoji: "🧛",
+            color: "crimson",
+            scale: 2.5,
+            isFinalBoss: true
+          };
+          bosses.push(boss);
+          finalBossSpawned = true;
+        }
+      }, 3000);
     }
 
-    // Progress the background story based on multiple triggers
+    // We no longer need the regular boss spawn function since we only want the final boss
+    function spawnBoss() {
+      // This function is kept for compatibility but does nothing now
+    }
+
+    // Progress the background story and change background image
     function progressStory() {
       if (storyIndex < storySegments.length) {
         currentStoryText = storySegments[storyIndex];
         storyLetterIndex = 0;
         storyRevealCounter = 0;
         storyIndex++;
+        
+        // If we've reached the last story segment, prepare to spawn the final boss
+        if (storyIndex >= storySegments.length && !storyComplete) {
+          storyComplete = true;
+          // Spawn the final boss after the last story segment is fully displayed
+          setTimeout(() => {
+            if (!gameOver && !finalBossSpawned) {
+              spawnFinalBoss();
+            }
+          }, 8000); // Wait for the player to read the final story segment
+        }
       } else {
-        // If we've gone through all segments, cycle back to a random one
-        const randomIndex = Math.floor(Math.random() * storySegments.length);
-        currentStoryText = storySegments[randomIndex];
-        storyLetterIndex = 0;
-        storyRevealCounter = 0;
+        // If story is already complete, don't cycle back
+        return;
       }
+      
+      // Change the background image
+      currentBackgroundIndex = (currentBackgroundIndex + 1) % backgroundImages.length;
+      backgroundImage.src = backgroundImages[currentBackgroundIndex];
     }
 
     // Story will be drawn directly in the draw function
@@ -324,10 +368,7 @@
                 score++;
                 updateUI();
                 
-                // We no longer progress the story based on score
-                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
-                  spawnBoss();
-                }
+                // No more boss spawning based on score
                 break;
               case "slow":
                 enemies.splice(ei, 1);
@@ -335,10 +376,7 @@
                 score++;
                 updateUI();
                 
-                // We no longer progress the story based on score
-                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
-                  spawnBoss();
-                }
+                // No more boss spawning based on score
                 break;
               case "explosive":
                 enemies.splice(ei, 1);
@@ -355,10 +393,7 @@
                 score++;
                 updateUI();
                 
-                // We no longer progress the story based on score
-                if (score >= nextBossScore && bosses.length === 0 && bossDefeatedCount < 10) {
-                  spawnBoss();
-                }
+                // No more boss spawning based on score
                 break;
               case "piercing":
                 enemies.splice(ei, 1);
@@ -405,8 +440,8 @@
             vy: Math.sin(angle) * bulletSpeed,
             emoji: "☠️"
           });
-          boss.attackTimer = 100 - Math.floor(score / 100) * 5;
-          if (boss.attackTimer < 40) boss.attackTimer = 40;
+          // Reset attack timer based on if it's the final boss or not
+          boss.attackTimer = boss.isFinalBoss ? 60 : 100;
         }
         
         // Check collision between player's bullets and the boss
@@ -419,12 +454,16 @@
             if (boss.health <= 0) {
               bosses.splice(bossIndex, 1);
               score += 30; // Bonus for defeating a boss
-              bossDefeatedCount++;
-              // No longer trigger story on boss defeat
-              updateUI();
-              if (bossDefeatedCount < 10) {
-                nextBossScore = (bossDefeatedCount + 1) * 100;
+              
+              // Final boss defeated means game won
+              if (boss.isFinalBoss) {
+                gameOver = true;
+                document.getElementById("gameOverMessage").innerHTML =
+                  `VICTORY!<br>You defeated the Vampire Lord!<br>Score: ${score}`;
+                document.getElementById("gameOverScreen").style.display = "flex";
               }
+              
+              bosses.splice(bossIndex, 1);
               break;
             }
           }
@@ -452,21 +491,32 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      // Draw the background image
+      if (backgroundImage.complete && backgroundImage.naturalHeight !== 0) {
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      } else {
+        // Fallback gradient background if image not loaded
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, "#000000");
+        gradient.addColorStop(1, "#434343");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      
       // Draw the background story text with a typewriter effect
       if (currentStoryText) {
         ctx.save();
-        ctx.globalAlpha = 0.25;
-        ctx.font = "italic 22px Georgia, serif";
-        ctx.fillStyle = "#f0f0f0";
+        ctx.globalAlpha = 1.0; // Full opacity for better visibility
+        ctx.font = "italic bold 24px Georgia, serif";
+        
+        // Text with black outline for better readability
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.shadowColor = "#800000";
-        ctx.shadowBlur = 5;
         
         const textToShow = currentStoryText.substring(0, storyLetterIndex);
         // Calculate line breaks to wrap text nicely
-        const maxWidth = canvas.width * 0.8;
-        const lineHeight = 30;
+        const maxWidth = canvas.width * 0.7;
+        const lineHeight = 36;
         const lines = [];
         let line = '';
         const words = textToShow.split(' ');
@@ -489,7 +539,15 @@
         const totalTextHeight = lines.length * lineHeight;
         const startY = canvas.height / 3 - totalTextHeight / 2;
         
+        // Draw text with black outline for better visibility
         lines.forEach((line, index) => {
+          // Draw text outline
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "black";
+          ctx.strokeText(line, canvas.width / 2, startY + index * lineHeight);
+          
+          // Draw text
+          ctx.fillStyle = "#e0e0e0"; // Bright grey
           ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
         });
         
@@ -500,12 +558,25 @@
       bullets.forEach(drawBullet);
       enemies.forEach(drawEnemy);
       bosses.forEach(boss => {
-        ctx.font = "80px Arial";
+        ctx.font = boss.isFinalBoss ? "140px Arial" : "80px Arial";
         ctx.fillStyle = boss.color;
-        ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
-        ctx.shadowColor = "red";
-        ctx.shadowBlur = 15;
-        ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+        
+        // Add special effects for final boss
+        if (boss.isFinalBoss) {
+          ctx.shadowColor = "red";
+          ctx.shadowBlur = 25;
+          ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+          
+          // Add a fiery glow effect
+          ctx.shadowColor = "orange";
+          ctx.shadowBlur = 15;
+          ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+        } else {
+          ctx.shadowColor = "red";
+          ctx.shadowBlur = 15;
+          ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+        }
+        
         ctx.shadowBlur = 0;
         ctx.font = "18px Arial";
         ctx.fillStyle = "red";
