@@ -108,7 +108,7 @@
     let fallSpeed = 0.5;
     let shootTimer = 0;
     let globalSlowTimer = 0;
-    let nextBossScore = 300; // Score threshold for next boss appearance
+    let nextBossScore = 100; // Score threshold for next boss appearance
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -239,7 +239,7 @@
         bosses.push(boss);
         
         // Calculate next boss score threshold
-        nextBossScore = score + 300;
+        nextBossScore = score + 150;
       }, 2000);
     }
 
