@@ -30,6 +30,27 @@
       padding: 0.3rem 0.8rem;
       border-radius: 8px;
     }
+    #bossWarning {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(139, 0, 0, 0.8);
+      color: white;
+      font-size: 2.5rem;
+      padding: 1.5rem 2.5rem;
+      border-radius: 10px;
+      border: 3px solid darkred;
+      text-align: center;
+      z-index: 15;
+      animation: pulse 1s infinite alternate;
+      text-shadow: 0 0 10px red;
+    }
+    @keyframes pulse {
+      from { box-shadow: 0 0 10px darkred; }
+      to { box-shadow: 0 0 25px red; }
+    }
     #gameOverScreen {
       display: none;
       position: fixed;
@@ -66,7 +87,8 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <div id="lives">Lives: 10</div>
+  <div id="lives">Score: 0</div>
+  <div id="bossWarning">WARNING! BOSS APPROACHING!</div>
   <div id="gameOverScreen">
     <div class="message" id="gameOverMessage"></div>
     <button id="restartBtn" onclick="location.reload()">Restart</button>
@@ -77,11 +99,12 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    // Add side padding to create invisible boundaries
+    const sidePadding = Math.min(80, canvas.width * 0.1); // Either 80px or 10% of screen width, whichever is smaller
+    
     let score = 0;
-    let lives = 10;
-    let highScore = localStorage.getItem("highScore") || 0;
+    let lives = 1; // Changed to only 1 life
     let gameOver = false;
-
     let waveCount = 1;
     let fallSpeed = 0.5;
     let shootTimer = 0;
@@ -98,6 +121,9 @@
 
     const bullets = [];
     const enemies = [];
+    // New arrays for boss enemies and their bullets
+    const bosses = [];
+    const bossBullets = [];
 
     const bulletEmojis = {
       regular: "🌹",
@@ -109,7 +135,7 @@
     let currentBulletType = "regular";
 
     function updateUI() {
-      document.getElementById("lives").textContent = "Lives: " + lives;
+      document.getElementById("lives").textContent = "Score: " + score;
     }
 
     function drawPlayer() {
@@ -127,38 +153,49 @@
       ctx.fillText(b.emoji, b.x, b.y);
     }
 
+    function drawBossBullet(b) {
+      ctx.font = "24px sans-serif";
+      ctx.fillText(b.emoji, b.x, b.y);
+    }
+
     function drawEnemy(e) {
       ctx.font = "24px Arial";
       ctx.fillText(e.emoji, e.x, e.y);
     }
 
+    // This function spawns normal enemy rows at a fixed interval
     function dropEnemyRows() {
       const interval = 300;
-      let x = 60;
+      let x = sidePadding + 60; // Start position respects side padding
       let direction = 1;
-      const margin = 60;
-      setInterval(() => {
-        if (!gameOver) {
+      
+      // Store the interval ID so we can clear it later when wave ends
+      const enemyInterval = setInterval(() => {
+        if (!gameOver && enemies.length < 50) {
           const emojiOptions = ["🦇", "🩸"];
           const emoji = emojiOptions[Math.floor(Math.random() * emojiOptions.length)];
           enemies.push({
-            x: Math.min(canvas.width - margin, Math.max(margin, x % canvas.width)),
+            x: Math.min(canvas.width - sidePadding - 24, Math.max(sidePadding, x)),
             y: -30,
             speed: fallSpeed + Math.random() * 0.5,
             dx: direction * 0.3,
             emoji: emoji
           });
           x += 40 * direction;
-          if (x > canvas.width - margin || x < margin) direction *= -1;
-          x = Math.max(margin, Math.min(canvas.width - margin, x));
+          // Changed boundary check to respect side padding
+          if (x > canvas.width - sidePadding - 24 || x < sidePadding) direction *= -1;
+          x = Math.max(sidePadding, Math.min(canvas.width - sidePadding - 24, x));
         }
       }, interval);
+      
+      // Return the interval ID so it can be cleared when needed
+      return enemyInterval;
     }
 
     function shoot() {
       const bullet = {
-        x: player.x + player.width / 2,
-        y: player.y,
+        x: player.x + player.width / 2 - 12, // Center the bullet on the tip of the triangle
+        y: player.y, // Start at the tip of the triangle
         type: currentBulletType,
         emoji: bulletEmojis[currentBulletType]
       };
@@ -168,16 +205,47 @@
       bullets.push(bullet);
     }
 
+    // Remove high score functionality from endGame()
     function endGame() {
       gameOver = true;
       document.getElementById("gameOverMessage").innerHTML =
-        `Game Over!<br>Score: ${score}<br>High Score: ${highScore}`;
+        `Game Over!<br>Score: ${score}`;
       document.getElementById("gameOverScreen").style.display = "flex";
+    }
+
+    // Spawns a gothic-styled boss with cool attack patterns.
+    function spawnBoss() {
+      // Show warning message before boss appears
+      const bossWarning = document.getElementById("bossWarning");
+      bossWarning.style.display = "block";
+      
+      // Hide warning and spawn boss after 2 seconds
+      setTimeout(() => {
+        bossWarning.style.display = "none";
+        
+        // Clear any stray enemies when a boss appears
+        enemies.length = 0;
+        
+        const boss = {
+          x: canvas.width / 2 - 50, // Wider boss
+          y: 50,
+          width: 100, // Increased size
+          height: 100, // Increased size
+          health: 20 + waveCount * 5, // Increases with wave count for difficulty
+          dx: 2,
+          attackTimer: 100, // Frames until next attack; will decrease as difficulty increases
+          emoji: "🧛",  // Gothic vampire boss emoji
+          color: "darkred",
+          scale: 1.5 // Scale factor for drawing
+        };
+        bosses.push(boss);
+      }, 2000);
     }
 
     function update() {
       if (gameOver) return;
 
+      // Player shooting mechanism
       if (shootTimer <= 0) {
         shoot();
         shootTimer = 10;
@@ -185,34 +253,33 @@
         shootTimer--;
       }
 
+      // Update player bullets
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.y -= 5;
         if (b.y < 0) bullets.splice(i, 1);
       }
 
+      // Slow effect timer for enemies
       if (globalSlowTimer > 0) globalSlowTimer--;
 
+      // Update normal enemies
       for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
         let speedFactor = (globalSlowTimer > 0) ? 0.5 : 1;
         e.y += e.speed * speedFactor;
         e.x += e.dx || 0;
-        if (e.x < 0 || e.x > canvas.width - 24) e.dx *= -1;
+        // Updated boundary check to respect side padding
+        if (e.x < sidePadding || e.x > canvas.width - sidePadding - 24) e.dx *= -1;
         if (e.y > canvas.height) {
           enemies.splice(i, 1);
-          lives--;
-          if (lives <= 0) {
-            if (score > highScore) {
-              highScore = score;
-              localStorage.setItem("highScore", highScore);
-            }
-            endGame();
-          }
-          updateUI();
+          // Game over if any enemy reaches the bottom
+          endGame();
+          return;
         }
       }
 
+      // Check collisions for player bullets and normal enemies
       for (let bi = bullets.length - 1; bi >= 0; bi--) {
         let b = bullets[bi];
         for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -257,17 +324,97 @@
         }
       }
 
-      if (enemies.length === 0 && !nextWaveReady) {
-        nextWaveReady = true;
-        setTimeout(() => {
-          waveCount++;
-          if (waveCount % 5 === 0 && fallSpeed < 3.0) fallSpeed += 0.2;
-          updateUI();
-          nextWaveReady = false;
-          dropEnemyRows();
-        }, 1000);
-        return;
+      // Update bosses (if any are active)
+      bosses.forEach((boss, bossIndex) => {
+        // Move boss horizontally; bounce off edges with side padding
+        boss.x += boss.dx;
+        if (boss.x < sidePadding || boss.x > canvas.width - sidePadding - boss.width) {
+          boss.dx *= -1;
+        }
+        // Handle boss attack: count down timer and fire a projectile toward the player
+        boss.attackTimer--;
+        if (boss.attackTimer <= 0) {
+          const angle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
+          const bulletSpeed = 4;
+          const bossBullet = {
+            x: boss.x + boss.width / 2,
+            y: boss.y + boss.height / 2,
+            vx: Math.cos(angle) * bulletSpeed,
+            vy: Math.sin(angle) * bulletSpeed,
+            emoji: "☠️"
+          };
+          bossBullets.push(bossBullet);
+          // Reset attack timer; becomes faster with increasing wave count but never too fast
+          boss.attackTimer = 100 - waveCount * 2;
+          if (boss.attackTimer < 40) boss.attackTimer = 40;
+        }
+        // Check collision between player's bullets and the boss
+        for (let bi = bullets.length - 1; bi >= 0; bi--) {
+          let b = bullets[bi];
+          if (b.x < boss.x + boss.width && b.x + 24 > boss.x && b.y < boss.y + boss.height && b.y + 24 > boss.y) {
+            bullets.splice(bi, 1);
+            boss.health--;
+            if (boss.health <= 0) {
+              bosses.splice(bossIndex, 1);
+              score += 10;  // Bonus score for defeating a boss
+              break;
+            }
+          }
+        }
+      });
+
+      // Update boss bullets and check for collision with player
+      for (let i = bossBullets.length - 1; i >= 0; i--) {
+        let bb = bossBullets[i];
+        bb.x += bb.vx;
+        bb.y += bb.vy;
+        if (bb.x < 0 || bb.x > canvas.width || bb.y < 0 || bb.y > canvas.height) {
+          bossBullets.splice(i, 1);
+          continue;
+        }
+        if (bb.x < player.x + player.width && bb.x + 24 > player.x && bb.y < player.y + player.height && bb.y + 24 > player.y) {
+          bossBullets.splice(i, 1);
+          // Game over immediately if hit by boss bullet
+          endGame();
+          return;
+        }
       }
+
+      // Store the current enemy spawn interval ID
+    let currentEnemyInterval = null;
+    
+    // Wave management: when there are no remaining enemies or bosses, prepare the next wave.
+    if (enemies.length === 0 && bosses.length === 0 && !nextWaveReady) {
+      nextWaveReady = true;
+      
+      // Clear existing enemy spawn interval if it exists
+      if (currentEnemyInterval) {
+        clearInterval(currentEnemyInterval);
+        currentEnemyInterval = null;
+      }
+      
+      setTimeout(() => {
+        waveCount++;
+        console.log("Starting wave:", waveCount); // Debug log
+        
+        // Increase enemy fall speed every 5 waves
+        if (waveCount % 5 === 0 && fallSpeed < 3.0) fallSpeed += 0.2;
+        
+        updateUI();
+        nextWaveReady = false;
+        
+        // Every third wave is a boss wave; otherwise, resume enemy rows.
+        if (waveCount % 3 === 0) {
+          console.log("Spawning boss"); // Debug log
+          spawnBoss();
+        } else {
+          console.log("Starting enemy wave"); // Debug log
+          // Start a new enemy interval
+          currentEnemyInterval = dropEnemyRows();
+        }
+      }, 1000);
+      return;
+    }
     }
 
     function draw() {
@@ -275,6 +422,25 @@
       drawPlayer();
       bullets.forEach(drawBullet);
       enemies.forEach(drawEnemy);
+      
+      // Draw bosses with a larger font size and a health indicator
+      bosses.forEach(boss => {
+        ctx.font = "80px Arial"; // Much larger font for bosses
+        ctx.fillStyle = boss.color;
+        ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+        
+        // Add a glowing effect around the boss
+        ctx.shadowColor = "red";
+        ctx.shadowBlur = 15;
+        ctx.fillText(boss.emoji, boss.x, boss.y + boss.height / 2);
+        ctx.shadowBlur = 0; // Reset shadow
+        
+        // Display boss health above the boss
+        ctx.font = "18px Arial"; // Larger health text
+        ctx.fillStyle = "red";
+        ctx.fillText("BOSS HP: " + boss.health, boss.x, boss.y - 15);
+      });
+      bossBullets.forEach(drawBossBullet);
     }
 
     function gameLoop() {
@@ -283,22 +449,32 @@
       if (!gameOver) requestAnimationFrame(gameLoop);
     }
 
-    // Updated event listeners with the new y-offset for player positioning
+    // Fixed mouse/touch position calculation to properly position player triangle
     canvas.addEventListener("mousemove", (e) => {
-      player.x = e.clientX - player.width / 2;
-      player.y = e.clientY - player.height * 1.5;
+      // Apply side padding to restrict player movement
+      player.x = Math.max(sidePadding, Math.min(e.clientX - player.width / 2, canvas.width - sidePadding - player.width));
+      // Position player above the pointer by a comfortable distance
+      player.y = e.clientY - player.height * 3; // Increased offset
     });
 
     canvas.addEventListener("touchmove", (e) => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
-        player.x = touch.clientX - player.width / 2;
-        player.y = touch.clientY - player.height * 1.5;
+        // Apply side padding to restrict player movement
+        player.x = Math.max(sidePadding, Math.min(touch.clientX - player.width / 2, canvas.width - sidePadding - player.width));
+        // Position player above the touch point by a comfortable distance for mobile
+        player.y = touch.clientY - player.height * 4; // Larger offset for mobile
         e.preventDefault();
       }
     }, { passive: false });
 
-    dropEnemyRows();
+    // Start by spawning enemy rows for the first wave
+    let currentEnemyInterval = dropEnemyRows();
+    
+    // Initialize the first UI update
+    updateUI();
+    
+    // Start the game loop
     gameLoop();
   </script>
 </body>
