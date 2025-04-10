@@ -623,10 +623,10 @@
     // Set a timer to automatically progress story for inactive players
     setInterval(() => {
       if (!gameOver && currentStoryText && storyLetterIndex >= currentStoryText.length) {
-        // If current story segment is fully revealed, show another one after 15 seconds
+        // If current story segment is fully revealed, show another one after 10 seconds
         progressStory();
       }
-    }, 15000);
+    }, 10000);
     
     currentEnemyInterval = dropEnemyRows();
     updateUI();
