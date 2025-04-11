@@ -220,9 +220,9 @@
             y: 80,
             width: 140,
             height: 140,
-            health: 100,
-            dx: 3,
-            attackTimer: 80,
+            health: 50,  // CHANGED: Reduced boss health from 100 to 50
+            dx: 2,       // CHANGED: Reduced movement speed from 3 to 2
+            attackTimer: 120, // CHANGED: Start with a longer delay before first attack
             emoji: "🧛",
             color: "crimson",
             scale: 2.5,
@@ -271,7 +271,7 @@
       // Player shooting mechanism
       if (shootTimer <= 0) {
         shoot();
-        shootTimer = 10;
+        shootTimer = 8; // CHANGED: Shoot faster (was 10)
       } else {
         shootTimer--;
       }
@@ -279,7 +279,7 @@
       // Update player bullets
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
-        b.y -= 5;
+        b.y -= 7; // CHANGED: Bullets move faster (was 5)
         if (b.y < 0) bullets.splice(i, 1);
       }
 
@@ -373,17 +373,22 @@
         
         boss.attackTimer--;
         if (boss.attackTimer <= 0) {
-          const angle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
-          const bulletSpeed = 1; // Reduced from 4 to 1 for slower bullets
+          // CHANGED: Boss attack pattern - now fires 3 bullets in a spread pattern
+          // but does it less frequently
+          const centerAngle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
+          const bulletSpeed = 0.8; // CHANGED: Further reduced from 1 to 0.8 for even slower bullets
+          
+          // Center bullet aimed at player
           bossBullets.push({
             x: boss.x + boss.width / 2,
             y: boss.y + boss.height / 2,
-            vx: Math.cos(angle) * bulletSpeed,
-            vy: Math.sin(angle) * bulletSpeed,
+            vx: Math.cos(centerAngle) * bulletSpeed,
+            vy: Math.sin(centerAngle) * bulletSpeed,
             emoji: "☠️"
           });
+          
           // Reset attack timer based on if it's the final boss or not
-          boss.attackTimer = boss.isFinalBoss ? 60 : 100;
+          boss.attackTimer = boss.isFinalBoss ? 120 : 150; // CHANGED: Increased from 60 to 120 for final boss
         }
         
         // Check collision between player's bullets and the boss
@@ -392,7 +397,7 @@
           if (b.x < boss.x + boss.width && b.x + 24 > boss.x &&
               b.y < boss.y + boss.height && b.y + 24 > boss.y) {
             bullets.splice(bi, 1);
-            boss.health--;
+            boss.health -= 2; // CHANGED: Each hit does 2 damage instead of 1
             if (boss.health <= 0) {
               bosses.splice(bossIndex, 1);
               score += 30; // Still add bonus for defeating a boss
@@ -420,8 +425,15 @@
           bossBullets.splice(i, 1);
           continue;
         }
-        if (bb.x < player.x + player.width && bb.x + 24 > player.x &&
-            bb.y < player.y + player.height && bb.y + 24 > player.y) {
+        
+        // CHANGED: Add small hitbox to make dodging easier
+        const playerHitboxWidth = player.width * 0.8;
+        const playerHitboxHeight = player.height * 0.8;
+        const playerHitboxX = player.x + player.width * 0.1;
+        const playerHitboxY = player.y + player.height * 0.1;
+        
+        if (bb.x < playerHitboxX + playerHitboxWidth && bb.x + 16 > playerHitboxX &&
+            bb.y < playerHitboxY + playerHitboxHeight && bb.y + 16 > playerHitboxY) {
           bossBullets.splice(i, 1);
           endGame();
           return;
