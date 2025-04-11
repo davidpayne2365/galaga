@@ -20,14 +20,7 @@
       height: 100vh;
     }
     #lives {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      font-size: 1.8rem;
-      z-index: 10;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 0.3rem 0.8rem;
-      border-radius: 8px;
+      display: none; /* Hide the score display */
     }
     #gameOverScreen {
       display: none;
@@ -82,8 +75,8 @@
     // Add side padding to create invisible boundaries
     const sidePadding = Math.min(80, canvas.width * 0.1);
     
-    let score = 0;
-    let lives = 1;
+    let score = 0; // We'll keep this variable but won't display it
+    let lives = 3;
     let gameOver = false;
     let fallSpeed = 1.0;
     let shootTimer = 0;
@@ -96,12 +89,11 @@
   "There is a Vampire Boss in this game",
   "He is so scary,",
   "He is coming here!",
-  "You better get ready to challenge him,",
+  "Get ready to challenge him,",
   "if he win he will take our blood!",
   "I'm so scared,",
-  "He is only 3 more messages away!",
   "I can hear him,",
-  "He smells our blood!",
+  "He smell our blood!",
   "Oh no, he's here...",
 ];
 
@@ -135,7 +127,7 @@
     let currentEnemyInterval = null;
 
     function updateUI() {
-      document.getElementById("lives").textContent = "Score: " + score;
+      // We won't update the score display anymore
     }
 
     function drawPlayer() {
@@ -204,8 +196,7 @@
 
     function endGame() {
       gameOver = true;
-      document.getElementById("gameOverMessage").innerHTML =
-        `Game Over!<br>Score: ${score}`;
+      document.getElementById("gameOverMessage").innerHTML = "Game Over!";
       document.getElementById("gameOverScreen").style.display = "flex";
     }
 
@@ -321,16 +312,16 @@
             switch (b.type) {
               case "regular":
                 enemies.splice(ei, 1);
-                score++;
-                updateUI();
+                score++; // Still increment score for game logic
+                // No UI update for score
                 
                 // No more boss spawning based on score
                 break;
               case "slow":
                 enemies.splice(ei, 1);
                 globalSlowTimer = 120;
-                score++;
-                updateUI();
+                score++; // Still increment score for game logic
+                // No UI update for score
                 
                 // No more boss spawning based on score
                 break;
@@ -343,18 +334,18 @@
                   const dy = other.y - b.y;
                   if (Math.sqrt(dx * dx + dy * dy) < explosionRadius) {
                     enemies.splice(j, 1);
-                    score++;
+                    score++; // Still increment score for game logic
                   }
                 }
-                score++;
-                updateUI();
+                score++; // Still increment score for game logic
+                // No UI update for score
                 
                 // No more boss spawning based on score
                 break;
               case "piercing":
                 enemies.splice(ei, 1);
-                score++;
-                updateUI();
+                score++; // Still increment score for game logic
+                // No UI update for score
                 
                 // Check if we should progress the story based on score
                 if (score > 0 && score % 20 === 0) {
@@ -383,7 +374,7 @@
         boss.attackTimer--;
         if (boss.attackTimer <= 0) {
           const angle = Math.atan2(player.y - (boss.y + boss.height / 2), player.x - (boss.x + boss.width / 2));
-          const bulletSpeed = 2; // Reduced from 4 to 2 for slower bullets
+          const bulletSpeed = 1; // Reduced from 4 to 1 for slower bullets
           bossBullets.push({
             x: boss.x + boss.width / 2,
             y: boss.y + boss.height / 2,
@@ -404,13 +395,12 @@
             boss.health--;
             if (boss.health <= 0) {
               bosses.splice(bossIndex, 1);
-              score += 30; // Bonus for defeating a boss
+              score += 30; // Still add bonus for defeating a boss
               
               // Final boss defeated means game won
               if (boss.isFinalBoss) {
                 gameOver = true;
-                document.getElementById("gameOverMessage").innerHTML =
-                  `VICTORY!<br>You defeated the Vampire Lord!<br>Score: ${score}`;
+                document.getElementById("gameOverMessage").innerHTML = "VICTORY!<br>You defeated the Vampire Lord!";
                 document.getElementById("gameOverScreen").style.display = "flex";
               }
               
@@ -560,10 +550,10 @@
     // Set a timer to automatically progress story for inactive players
     setInterval(() => {
       if (!gameOver) {
-        // Progress the story every 8 seconds
+        // Progress the story every 6 seconds
         progressStory();
       }
-    }, 8000);
+    }, 6000);
     
     currentEnemyInterval = dropEnemyRows();
     updateUI();
