@@ -85,7 +85,7 @@
     let score = 0;
     let lives = 1;
     let gameOver = false;
-    let fallSpeed = 0.5;
+    let fallSpeed = 1.0;
     let shootTimer = 0;
     let globalSlowTimer = 0;
     let finalBossSpawned = false; // Track if final boss has spawned
@@ -93,54 +93,23 @@
 
     // Story variables for background narrative
     const storySegments = [
-  "Once, the village thrived under moonlit skies. But wealth turned to whispers, and whispers to fear, when the vampire baron came.",
-  "With a silver tongue and vile intentions, he promised prosperity yet drained not only veins, but joy, and memory itself.",
-  "They called it the Blood Tithe. Each night, another soul vanished. Each dawn, the village awoke emptier than before.",
-  "Taverns closed. Music died. Even dreams began to fade, The Village smothered beneath the weight of fear from the man in the castle.",
-  "Among the lost was her beloved—taken in silence, turned into the baron’s thrall, eyes dim with forgetfulness.",
-  "Grief hollowed her, but left behind a blade. And from the ashes of love, she rose—not as a mourner, but as a woman scorned, ready to seek redemption.",
-  "She crossed the dead moor alone, cloak torn by thorns, heart armored in fury. The castle’s silhouette was a wound on the horizon.",
-  "Its gates groaned open like the jaws of a beast. Within: gilded rot, blood-slick corridors, and her lover’s memory in shadow.",
-  "The halls were gold and winding. Chandeliers glinted with jewels paid in suffering. Silence reigned, bought with fear.",
-  "In the ballroom, phantoms twirled in eternal debt. Their laughter was empty, choreographed by the baron’s will.",
-  "The library hissed secret grim tomes bound in skin, debt ledgers penned in centuries of pain, names long erased by time.",
-  "She fought the guardians of the castle, with their teeth bared, claws inked with grime. Men once noble, now demons with flesh stretched thin.",
-  "Tombstones surrounded by Black roses blooming in the garden, their smooth stone etched with names. She found hers. She found her love’s.",
-  "Statues turned their heads. Portraits wept. Even the walls bled stories. This place was alive, and it remembered her.",
-  "In a desecrated chapel, she lit a fire at the altar setting ablaze the tapestries and flames began spreading throughout the surrounding rooms",
-  "Through mirrored corridors, she saw herself,  shattered mother, lover, warrior, ghost all paths stolen by one man’s greed.",
-  "But she remembered the laugh she loved. The hand she once held. And that memory became her compass through the flames and fear.",
-  "At last, atop the spiraling tower, he waited: the vampire baron, cloaked in centuries, adoned in dark velvet robes, a patronizing glimmer in his eyes.",
-  "He called her ‘child.’ She answered with silence—and a blade humming with every woman wronged before her.",
-  "Their battle cracked the castle’s spine. Blood and fear from both spilled. The baron wailed in pain his face twisted in a cold grimace as he fell before her.",
-  "With a final strike, she severed his tongue silencing his lies and drove her blade through the ledger he called a heart.",
-  "The castle trembled. Portraits aged. Chains shattered. The dead sighed free. The curse, written in wealth, was torn at last.",
-  "She stood in the ruins, blood on her hands, ash in her lungs. The silence was deafening—and sacred.",
-  "Later back in the village, Doors creaked open. Soil softened. Songs returned in broken hums, mended one note at a time.",
-  "Her love’s name, once erased, was carved anew upon the chapel wall—no longer claimed, but remembered.",
-  "She did not stay. Some wounds cannot be home again. But the people watched the horizon now, and they knew who saved them.",
-  "And high above the village, where the castle once stood, the sky held no shadow only stars."
+  "There is a Vampire Boss in this game",
+  "He is the hardest Boss in any game",
+  "The vampire is coming here!",
+  "You better get ready to challenge him,",
+  "if he defeats you the game will end!",
+  "He has never been beaten",
+  "He is only 3 more messages away!",
+  "I can hear him.",
+  "He smells our blood!",
+  "Oh no, he's here...",
 ];
 
 
     let currentStoryText = "";
-    let storyLetterIndex = 0;
-    let storyRevealCounter = 0;
-    let storyRevealDelay = 3; // frames delay between letters
     let storyIndex = 0; // Track which story segment we're on
-    // Background image variables
-    const backgroundImages = [
-      "castle_blue.png",
-      "castle_green.png", 
-      "castle_indigo.png",
-      "castle_orange.png",
-      "castle_rainbow.png",
-      "castle_red.png",
-      "castle_violet.png",
-      "castle_yellow.png"
-    ];
-    let currentBackgroundIndex = 0;
-    let backgroundImage = new Image();
+    // No background images, just using black background
+    let useBlackBackground = true;
 
     const player = {
       x: canvas.width / 2 - 15,
@@ -246,14 +215,11 @@
       
       // Display a final boss warning message in the story text
       currentStoryText = "THE VAMPIRE LORD APPROACHES! PREPARE FOR THE FINAL BATTLE!";
-      storyLetterIndex = 0;
-      storyRevealCounter = 0;
       
       // Clear all enemies
       enemies.length = 0;
       
-      // Change background to the most dramatic one (rainbow)
-      backgroundImage.src = "castle_rainbow.png";
+      // No special background for boss
       
       // Create the final boss with more health and abilities
       setTimeout(() => {
@@ -286,8 +252,6 @@
     function progressStory() {
       if (storyIndex < storySegments.length) {
         currentStoryText = storySegments[storyIndex];
-        storyLetterIndex = 0;
-        storyRevealCounter = 0;
         storyIndex++;
         
         // If we've reached the last story segment, prepare to spawn the final boss
@@ -305,9 +269,7 @@
         return;
       }
       
-      // Change the background image
-      currentBackgroundIndex = (currentBackgroundIndex + 1) % backgroundImages.length;
-      backgroundImage.src = backgroundImages[currentBackgroundIndex];
+      // No background images to change
     }
 
     // Story will be drawn directly in the draw function
@@ -328,15 +290,6 @@
         let b = bullets[i];
         b.y -= 5;
         if (b.y < 0) bullets.splice(i, 1);
-      }
-
-      // Update story text for typewriter effect
-      if (currentStoryText && storyLetterIndex < currentStoryText.length) {
-        storyRevealCounter++;
-        if (storyRevealCounter >= storyRevealDelay) {
-          storyLetterIndex++;
-          storyRevealCounter = 0;
-        }
       }
 
       // Slow effect timer for enemies
@@ -404,15 +357,10 @@
                 updateUI();
                 
                 // Check if we should progress the story based on score
-                if (score >= scoreForNextStory) {
+                if (score > 0 && score % 20 === 0) {
                   progressStory();
-                  scoreForNextStory += 20; // Next story segment in 20 more points
                 }
                 
-                if (score >= nextBossScore && bosses.length === 0 &&
-                    document.getElementById("bossWarning").style.display !== "block" && bossDefeatedCount < 10) {
-                  spawnBoss();
-                }
                 b.pierce--;
                 bulletHit = b.pierce <= 0;
                 break;
@@ -494,19 +442,11 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the background image
-      if (backgroundImage.complete && backgroundImage.naturalHeight !== 0) {
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-      } else {
-        // Fallback gradient background if image not loaded
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, "#000000");
-        gradient.addColorStop(1, "#434343");
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      // Draw black background
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the background story text with a typewriter effect
+      // Draw the background story text without typewriter effect
       if (currentStoryText) {
         ctx.save();
         ctx.globalAlpha = 1.0; // Full opacity for better visibility
@@ -516,13 +456,12 @@
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         
-        const textToShow = currentStoryText.substring(0, storyLetterIndex);
         // Calculate line breaks to wrap text nicely
         const maxWidth = canvas.width * 0.7;
         const lineHeight = 36;
         const lines = [];
         let line = '';
-        const words = textToShow.split(' ');
+        const words = currentStoryText.split(' ');
         
         for (const word of words) {
           const testLine = line + word + ' ';
@@ -550,7 +489,7 @@
           ctx.strokeText(line, canvas.width / 2, startY + index * lineHeight);
           
           // Draw text
-          ctx.fillStyle = "#e0e0e0"; // Bright grey
+          ctx.fillStyle = "#888888"; // Gray color
           ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
         });
         
@@ -616,17 +555,15 @@
 
     // Initialize with first story segment to welcome the player
     currentStoryText = "Welcome, vampire hunter. Prepare to face the darkness...";
-    storyLetterIndex = 0;
-    storyRevealCounter = 0;
     storyIndex = 0;
     
     // Set a timer to automatically progress story for inactive players
     setInterval(() => {
-      if (!gameOver && currentStoryText && storyLetterIndex >= currentStoryText.length) {
-        // If current story segment is fully revealed, show another one after 10 seconds
+      if (!gameOver) {
+        // Progress the story every 8 seconds
         progressStory();
       }
-    }, 10000);
+    }, 8000);
     
     currentEnemyInterval = dropEnemyRows();
     updateUI();
